@@ -15,10 +15,10 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import frc.robot.Constants.Intake;
-import frc.robot.subsystems.IntakeSubsystem;
+import frc.robot.subsystems.EndEffectorSubsystem;
 
 public class RobotContainer {
-  private final IntakeSubsystem m_intakeSubsystem;
+  private final EndEffectorSubsystem m_intakeSubsystem;
   private final XBoxWrapper driver = new XBoxWrapper(Ports.Joysticks.DRIVER);
   private final XBoxWrapper operator = new XBoxWrapper(Ports.Joysticks.OPERATOR);
   //private final SendableChooser<Command> autoChooser;
@@ -26,7 +26,7 @@ public class RobotContainer {
   public RobotContainer() {
 
     // Register the your subsystems here
-    m_intakeSubsystem = new IntakeSubsystem();
+    m_intakeSubsystem = new EndEffectorSubsystem();
     CommandScheduler.getInstance().registerSubsystem(m_intakeSubsystem);
 
     configureBindings();

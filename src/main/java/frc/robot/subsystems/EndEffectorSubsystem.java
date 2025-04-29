@@ -7,12 +7,12 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
 import frc.robot.Constants.Intake;
 
-public class IntakeSubsystem extends SubsystemBase  {
+public class EndEffectorSubsystem extends SubsystemBase  {
     private final TalonSRX intakeMotor = new TalonSRX(Intake.Intake_Motor_id);
 
 
 
-    public IntakeSubsystem() {
+    public EndEffectorSubsystem() {
         TalonSRXConfiguration config = new TalonSRXConfiguration();
         config.slot0.kP = 0.12;
         config.slot0.kI = 0.11;
