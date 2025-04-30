@@ -19,6 +19,7 @@ import frc.robot.subsystems.EndEffectorSubsystem;
 
 public class RobotContainer {
   private final EndEffectorSubsystem m_intakeSubsystem;
+  private final ArmSubsystem armSubsystem;
   private final XBoxWrapper driver = new XBoxWrapper(Ports.Joysticks.DRIVER);
   private final XBoxWrapper operator = new XBoxWrapper(Ports.Joysticks.OPERATOR);
   //private final SendableChooser<Command> autoChooser;
@@ -27,6 +28,8 @@ public class RobotContainer {
 
     // Register the your subsystems here
     m_intakeSubsystem = new EndEffectorSubsystem();
+    armSubsystem = new ArmSubsystem();
+    CommandScheduler.getInstance().registerSubsystem(armSubsystem);
     CommandScheduler.getInstance().registerSubsystem(m_intakeSubsystem);
 
     configureBindings();
@@ -45,6 +48,7 @@ public class RobotContainer {
   }
 
   private void OperatorBinds() {
+    operator.Y.onTrue(new ScoreL1Command(armSubsystem, m_intakeSubsystem));
     operator.A.onTrue(new InstantCommand(() -> m_intakeSubsystem.intake()));
     operator.A.onFalse(new InstantCommand(() -> m_intakeSubsystem.stop()));
     operator.B.onTrue(new InstantCommand(() -> m_intakeSubsystem.outtake()));
