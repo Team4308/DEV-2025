@@ -16,9 +16,11 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import frc.robot.Constants.Intake;
 import frc.robot.subsystems.EndEffectorSubsystem;
+import frc.robot.subsystems.VisionSubsystem;
 
 public class RobotContainer {
   private final EndEffectorSubsystem m_intakeSubsystem;
+  private final VisionSubsystem m_visionSubsystem;
   private final XBoxWrapper driver = new XBoxWrapper(Ports.Joysticks.DRIVER);
   private final XBoxWrapper operator = new XBoxWrapper(Ports.Joysticks.OPERATOR);
   //private final SendableChooser<Command> autoChooser;
@@ -27,6 +29,7 @@ public class RobotContainer {
 
     // Register the your subsystems here
     m_intakeSubsystem = new EndEffectorSubsystem();
+    m_visionSubsystem = new VisionSubsystem();
     CommandScheduler.getInstance().registerSubsystem(m_intakeSubsystem);
 
     configureBindings();
