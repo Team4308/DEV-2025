@@ -1,6 +1,9 @@
 package frc.robot.subsystems.Vision;
 
+import frc.robot.Constants;
 import frc.robot.subsystems.Vision.LimelightHelpers;
+import pabeles.concurrency.IntOperatorTask.Max;
+
 import java.util.function.Supplier;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
@@ -31,17 +34,18 @@ public class VisionSubsystem extends SubsystemBase {
     );
     private Pose2d posEstimate;
     private double confidence;
+    private double ideal_detection_range = Constants.Vision.ideal_detection_range;
 
     public VisionSubsystem(Supplier<Pose2d> currentPos) {
         setCamMode(0); // Vision processing mode
         LimelightHelpers.setLEDMode_ForceOn("limelight");
-        LimelightHelpers.setCameraPose_RobotSpace("limelight",  // meters and degrees rn
-        0.5,    // Forward offset (meters)
-        0.0,    // Side offset (meters)
-        0.5,    // Height offset (meters)
-        0.0,    // Roll (degrees)
-        30.0,   // Pitch (degrees)
-        0.0     // Yaw (degrees)
+        LimelightHelpers.setCameraPose_RobotSpace("limelight",  // meters and degrees
+        Constants.Vision.cam_offset_front,   
+        Constants.Vision.cam_offset_side,   
+        Constants.Vision.cam_offset_up,   
+        Constants.Vision.cam_offset_roll,   
+        Constants.Vision.cam_offset_pitch, 
+        Constants.Vision.cam_offset_yaw   
         );
     }
 
@@ -50,8 +54,10 @@ public class VisionSubsystem extends SubsystemBase {
         LimelightHelpers.SetRobotOrientation("limelight", m_poseEstimator.getEstimatedPosition().getRotation().getDegrees(), 0, 0, 0, 0, 0);
         LimelightHelpers.PoseEstimate limelightMeasurement = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight");
         
-        if(!hasValidTarget()){rejectUpdate = true;}
+        if(!hasValidTarget() || Math.abs(m_gyro.getRate()) > 360){rejectUpdate = true;}
         if(!rejectUpdate) {
+            //confidence = Math.max(1, ideal_detection_range/limelightMeasurement.avgTagDist);
+            confidence = 0.7;   
             m_poseEstimator.addVisionMeasurement(
                 limelightMeasurement.pose,
                 limelightMeasurement.timestampSeconds,
