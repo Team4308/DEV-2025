@@ -16,7 +16,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import frc.robot.Constants.Intake;
 import frc.robot.subsystems.EndEffectorSubsystem;
-import frc.robot.subsystems.VisionSubsystem;
+import frc.robot.subsystems.Vision.VisionSubsystem;
 
 public class RobotContainer {
   private final EndEffectorSubsystem m_intakeSubsystem;
