@@ -18,8 +18,8 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 
 public class VisionSubsystem extends SubsystemBase {
     private final NetworkTable limelight = NetworkTableInstance.getDefault().getTable("limelight");
-    private final DifferentialDriveKinematics m_kinematics = new DifferentialDriveKinematics(Units.inchesToMeters(24.0)); // Example track width
-    private final ADXRS450_Gyro m_gyro = new ADXRS450_Gyro();
+    private final DifferentialDriveKinematics m_kinematics = new DifferentialDriveKinematics(Units.inchesToMeters(24.0)); // filler track width
+    private final ADXRS450_Gyro m_gyro = new ADXRS450_Gyro();   // filler gyro
     private final Encoder m_leftEncoder = new Encoder(0, 1); // filler encoder ports
     private final Encoder m_rightEncoder = new Encoder(2, 3); // filler encoder ports
     private final DifferentialDrivePoseEstimator m_poseEstimator = 
@@ -49,7 +49,7 @@ public class VisionSubsystem extends SubsystemBase {
         );
     }
 
-    public void updateEstimatedPose() {
+    public void updateEstimatedPose() {     // gobal position with blue side right as origin
         Boolean rejectUpdate = false;  
         LimelightHelpers.SetRobotOrientation("limelight", m_poseEstimator.getEstimatedPosition().getRotation().getDegrees(), 0, 0, 0, 0, 0);
         LimelightHelpers.PoseEstimate limelightMeasurement = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight");
@@ -67,7 +67,7 @@ public class VisionSubsystem extends SubsystemBase {
         posEstimate = m_poseEstimator.getEstimatedPosition();
     }
 
-    public Pose2d getEstimatedPose(){
+    public Pose2d getEstimatedPose(){ // gobal position with blue side right as origin
         return posEstimate;
     }
 
