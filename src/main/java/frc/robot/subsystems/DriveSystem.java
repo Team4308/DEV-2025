@@ -4,7 +4,11 @@ import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.TalonSRXControlMode;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
+import com.pathplanner.lib.config.RobotConfig;
+import com.pathplanner.lib.controllers.PPLTVController;
+
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -13,7 +17,7 @@ import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import frc.robot.Constants;
 import com.studica.frc.AHRS;
 import com.studica.frc.AHRS.NavXComType;
-
+import com.pathplanner.lib.auto.AutoBuilder;
 public class DriveSystem extends SubsystemBase {
     public static WPI_TalonSRX leaderLeft, leaderRight;
     private final WPI_TalonSRX followerLeft1, followerRight1, followerLeft2, followerRight2;
@@ -21,6 +25,7 @@ public class DriveSystem extends SubsystemBase {
     private DifferentialDrive diffDrive;
     private DifferentialDriveOdometry m_odometry;
     private Simulation simulation;
+    private RobotConfig config;
 
     public DriveSystem() {
         leaderLeft = new WPI_TalonSRX(Constants.Mapping.Drive.Left);
@@ -60,6 +65,29 @@ public class DriveSystem extends SubsystemBase {
         if (RobotBase.isSimulation()) {
             simulation = new Simulation(leaderLeft, leaderRight);
         }
+
+        try {
+        config = RobotConfig.fromGUISettings();
+        } catch (Exception e) {
+            System.out.println("Error loading robot config: " + e.getMessage());
+        }
+        AutoBuilder.configure(
+            this::getPose, 
+            pose -> resetHeading(), 
+            this::getRobotRelativeSpeeds, 
+            (speeds, feedforwards) -> driveRobotRelative(speeds), 
+            new PPLTVController(0.02), 
+            config, 
+            () -> {
+
+              var alliance = DriverStation.getAlliance();
+              if (alliance.isPresent()) {
+                return alliance.get() == DriverStation.Alliance.Red;
+              }
+              return false;
+            },
+            this 
+        );
     }
 
     @Override
@@ -159,5 +187,22 @@ public class DriveSystem extends SubsystemBase {
             imu.reset();
         }
     }
-}
 
+    private edu.wpi.first.math.kinematics.ChassisSpeeds getRobotRelativeSpeeds() {
+        return new edu.wpi.first.math.kinematics.ChassisSpeeds();
+    }
+
+    private void driveRobotRelative(edu.wpi.first.math.kinematics.ChassisSpeeds speeds) {
+        double forward = speeds.vxMetersPerSecond;
+        double rotation = speeds.omegaRadiansPerSecond;
+
+        double maxSpeed = 3.0; // meters per sec
+        double maxAngular = Math.PI; // rad per sec
+
+        double forwardPercent = Math.max(-1.0, Math.min(1.0, forward / maxSpeed));
+        double rotationPercent = Math.max(-1.0, Math.min(1.0, rotation / maxAngular));
+
+        diffDrive.arcadeDrive(forwardPercent, rotationPercent, false);
+    }
+
+}

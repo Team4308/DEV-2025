@@ -4,8 +4,15 @@
 
 package frc.robot;
 
+import frc.robot.Constants.Intake;
+import frc.robot.commands.intake;
 import frc.robot.subsystems.DriveSystem;
+
+import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.auto.NamedCommands;
+
 import ca.team4308.absolutelib.control.XBoxWrapper;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -23,7 +30,7 @@ public class RobotContainer {
 
   private final XBoxWrapper driver = new XBoxWrapper(Ports.Joysticks.DRIVER);
   private final XBoxWrapper operator = new XBoxWrapper(Ports.Joysticks.OPERATOR);
-  //private final SendableChooser<Command> autoChooser;
+  private final SendableChooser<Command> autoChooser;
 
   public RobotContainer() {
     // Register subsystems
@@ -31,15 +38,13 @@ public class RobotContainer {
     m_driveSystem = new DriveSystem();
     m_robotDrive = new DifferentialDrive(m_driveSystem.leaderLeft, m_driveSystem.leaderRight);
 
-
-
     CommandScheduler.getInstance().registerSubsystem(m_intakeSubsystem);
     CommandScheduler.getInstance().registerSubsystem(m_driveSystem);
-
+    configureNamedCommands();
     configureBindings();
     
-    //autoChooser = AutoBuilder.buildAutoChooser();
-    //SmartDashboard.putData("Auto Chooser", autoChooser);
+    autoChooser = AutoBuilder.buildAutoChooser();
+    SmartDashboard.putData("Auto Chooser", autoChooser);
   }
 
   private void configureBindings() {
@@ -52,7 +57,7 @@ public class RobotContainer {
       new RunCommand(
         () -> {
           double xSpeed = -driver.getLeftY();
-          double zRotation = driver.getRightX();
+          double zRotation = driver.getLeftX();
         
           m_robotDrive.arcadeDrive(xSpeed, zRotation, true);
 
@@ -64,7 +69,9 @@ public class RobotContainer {
       )
     );
   }
-  
+  public void configureNamedCommands() {
+    NamedCommands.registerCommand("l1", new intake(m_intakeSubsystem));
+  }
 
   private void OperatorBinds() {
     operator.A.onTrue(new InstantCommand(() -> m_intakeSubsystem.intake()));
@@ -73,6 +80,6 @@ public class RobotContainer {
   }
 
   public Command getAutonomousCommand() {
-    return Commands.print("No autonomous command configured");
+    return autoChooser.getSelected();
   }
 }

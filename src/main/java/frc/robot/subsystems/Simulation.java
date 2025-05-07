@@ -35,7 +35,7 @@ public class Simulation extends SubsystemBase {
     private Field2d fieldSim;
     
     private final DifferentialDriveKinematics kinematics;
-    private final Pose2d initialPose = new Pose2d(2, 2, new Rotation2d());
+    private final Pose2d initialPose = new Pose2d(8, 6, new Rotation2d());
     
     private NetworkTableEntry typeEntry;
     private NetworkTableEntry chassisSpeedsEntry;
