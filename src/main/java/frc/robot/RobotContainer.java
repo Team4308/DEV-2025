@@ -4,18 +4,14 @@
 
 package frc.robot;
 
-import com.pathplanner.lib.auto.AutoBuilder;
 import frc.robot.subsystems.DriveSystem;
 import ca.team4308.absolutelib.control.XBoxWrapper;
-import edu.wpi.first.wpilibj.GenericHID.RumbleType;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
-import frc.robot.Constants.Intake;
 import frc.robot.subsystems.EndEffectorSubsystem;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 
@@ -30,10 +26,9 @@ public class RobotContainer {
   //private final SendableChooser<Command> autoChooser;
 
   public RobotContainer() {
-    // Register the subsystems
+    // Register subsystems
     m_intakeSubsystem = new EndEffectorSubsystem();
     m_driveSystem = new DriveSystem();
-    
     m_robotDrive = new DifferentialDrive(m_driveSystem.leaderLeft, m_driveSystem.leaderRight);
 
 
@@ -56,9 +51,14 @@ public class RobotContainer {
     m_driveSystem.setDefaultCommand(
       new RunCommand(
         () -> {
-          double throttle = -driver.getLeftY();
-          double turn = driver.getLeftX();   
-         m_robotDrive.arcadeDrive(throttle, turn, false); 
+          double xSpeed = -driver.getLeftY();
+          double zRotation = driver.getRightX();
+        
+          m_robotDrive.arcadeDrive(xSpeed, zRotation, true);
+
+          SmartDashboard.putNumber("Drive Speed", xSpeed);
+          SmartDashboard.putNumber("Drive Rotation", zRotation);
+          SmartDashboard.putNumber("Robot Heading", m_driveSystem.getHeading());
         },
         m_driveSystem
       )

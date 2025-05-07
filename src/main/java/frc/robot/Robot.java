@@ -20,18 +20,14 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotInit() {
-    // Put battery voltage on SmartDashboard
     SmartDashboard.putNumber("Battery Voltage", RobotController.getBatteryVoltage());
-    
-    // Indicate simulation status
-    SmartDashboard.putBoolean("Simulation Mode", isSimulation());
+        SmartDashboard.putBoolean("Simulation Mode", isSimulation());
   }
 
   @Override
   public void robotPeriodic() {
     CommandScheduler.getInstance().run();
     
-    // Update battery voltage display
     SmartDashboard.putNumber("Battery Voltage", RobotController.getBatteryVoltage());
   }
 
