@@ -2,14 +2,9 @@ package frc.robot.subsystems.Vision;
 
 import frc.robot.Constants;
 import frc.robot.subsystems.Vision.LimelightHelpers;
-import frc.robot.subsystems.Vision.LimelightHelpers.LimelightResults;
-import frc.robot.subsystems.Vision.LimelightHelpers.LimelightTarget_Detector;
 import frc.robot.subsystems.Vision.LimelightHelpers.RawDetection;
 import pabeles.concurrency.IntOperatorTask.Max;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.function.Supplier;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
@@ -39,8 +34,7 @@ public class VisionSubsystem extends SubsystemBase {
         VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(30))
     );
     private Pose2d posEstimate;
-    private int targetCount;
-    private double confidence;
+    private int targetCount = 0;
     private double ideal_detection_range = Constants.Vision.ideal_detection_range;
 
     public VisionSubsystem(Supplier<Pose2d> currentPos) {
@@ -63,12 +57,11 @@ public class VisionSubsystem extends SubsystemBase {
         
         if(!hasValidTarget() || Math.abs(m_gyro.getRate()) > 360){rejectUpdate = true;}
         if(!rejectUpdate) {
-            //confidence = Math.max(1, ideal_detection_range/limelightMeasurement.avgTagDist);
-            confidence = 0.7;   
+            double stdDevs = limelightMeasurement.avgTagDist/ideal_detection_range;  
             m_poseEstimator.addVisionMeasurement(
                 limelightMeasurement.pose,
                 limelightMeasurement.timestampSeconds,
-                VecBuilder.fill(confidence, confidence, 9999999)
+                VecBuilder.fill(stdDevs, stdDevs, 9999999)
                 );
         }
         posEstimate = m_poseEstimator.getEstimatedPosition();
@@ -97,7 +90,9 @@ public class VisionSubsystem extends SubsystemBase {
 
 public Double[][] getDetectorResults() { 
     // Returns [classID, target center normalized X coord, target center normalized Y coord, percent of space taken up]
+    // normalized results between -1 and 1
     RawDetection[] results = LimelightHelpers.getRawDetections("limelight");
+    targetCount = results.length;
     if (results.length == 0) return new Double[0][0];
     
     Double[][] detections = new Double[results.length][4];
@@ -113,8 +108,11 @@ public Double[][] getDetectorResults() {
     }
     
     return detections;
-}
-    
+    }
+
+    public int getTargetCount(){
+        return targetCount;
+    }
 
     @Override
     public void periodic() {
