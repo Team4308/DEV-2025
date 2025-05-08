@@ -2,8 +2,14 @@ package frc.robot.subsystems.Vision;
 
 import frc.robot.Constants;
 import frc.robot.subsystems.Vision.LimelightHelpers;
+import frc.robot.subsystems.Vision.LimelightHelpers.LimelightResults;
+import frc.robot.subsystems.Vision.LimelightHelpers.LimelightTarget_Detector;
+import frc.robot.subsystems.Vision.LimelightHelpers.RawDetection;
 import pabeles.concurrency.IntOperatorTask.Max;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Supplier;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
@@ -33,6 +39,7 @@ public class VisionSubsystem extends SubsystemBase {
         VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(30))
     );
     private Pose2d posEstimate;
+    private int targetCount;
     private double confidence;
     private double ideal_detection_range = Constants.Vision.ideal_detection_range;
 
@@ -80,16 +87,38 @@ public class VisionSubsystem extends SubsystemBase {
         setCamMode(currentMode == 0 ? 1 : 0);   // 0 is vision 1 is driver
     }
 
-    public void setCamMode(int mode) {
+    public void setCamMode(int mode) { // 0 is vision 1 is driver
         limelight.getEntry("camMode").setNumber(mode);
     }
 
-    public void setPipeLine(int pipeline){
+    public void setPipeLine(int pipeline){      // 0 is april tags 1 is detector
         limelight.getEntry("pipeline").setNumber(pipeline);
     }
 
+public Double[][] getDetectorResults() { 
+    // Returns [classID, target center normalized X coord, target center normalized Y coord, percent of space taken up]
+    RawDetection[] results = LimelightHelpers.getRawDetections("limelight");
+    if (results.length == 0) return new Double[0][0];
+    
+    Double[][] detections = new Double[results.length][4];
+    
+    for (int i = 0; i < results.length; i++) {
+        RawDetection detection = results[i];
+        detections[i] = new Double[] {
+            (double) detection.classId,
+            detection.txnc, 
+            detection.tync,
+            detection.ta 
+        };
+    }
+    
+    return detections;
+}
+    
+
     @Override
     public void periodic() {
+        setPipeLine(1);
         updateEstimatedPose();
     }
 }
