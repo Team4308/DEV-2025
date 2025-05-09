@@ -1,9 +1,7 @@
 package frc.robot.subsystems.Vision;
 
 import frc.robot.Constants;
-import frc.robot.subsystems.Vision.LimelightHelpers;
 import frc.robot.subsystems.Vision.LimelightHelpers.RawDetection;
-import pabeles.concurrency.IntOperatorTask.Max;
 
 import java.util.function.Supplier;
 import edu.wpi.first.math.VecBuilder;
@@ -18,7 +16,6 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 
 public class VisionSubsystem extends SubsystemBase {
-    private final NetworkTable limelight = NetworkTableInstance.getDefault().getTable("limelight");
     private final DifferentialDriveKinematics m_kinematics = new DifferentialDriveKinematics(Units.inchesToMeters(24.0)); // filler track width
     private final ADXRS450_Gyro m_gyro = new ADXRS450_Gyro();   // filler gyro
     private final Encoder m_leftEncoder = new Encoder(0, 1); // filler encoder ports
@@ -33,6 +30,10 @@ public class VisionSubsystem extends SubsystemBase {
         VecBuilder.fill(0.05, 0.05, Units.degreesToRadians(5)),
         VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(30))
     );
+
+    private final NetworkTable limelight = NetworkTableInstance.getDefault().getTable("limelight");
+    private int pipeline = 0;   // 0 is apriltag 1 is neural detector
+    private int camMode = 0;    // 0 is vision 1 is driver
     private Pose2d posEstimate;
     private int targetCount = 0;
     private double ideal_detection_range = Constants.Vision.ideal_detection_range;
@@ -51,11 +52,14 @@ public class VisionSubsystem extends SubsystemBase {
     }
 
     public void updateEstimatedPose() {     // gobal position with blue side right as origin
+        setPipeLine(0);
+        setCamMode(0);
+
         Boolean rejectUpdate = false;  
         LimelightHelpers.SetRobotOrientation("limelight", m_poseEstimator.getEstimatedPosition().getRotation().getDegrees(), 0, 0, 0, 0, 0);
         LimelightHelpers.PoseEstimate limelightMeasurement = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight");
         
-        if(!hasValidTarget() || Math.abs(m_gyro.getRate()) > 360){rejectUpdate = true;}
+        if(!hasValidAprilTarget() || Math.abs(m_gyro.getRate()) > 360){rejectUpdate = true;}
         if(!rejectUpdate) {
             double stdDevs = limelightMeasurement.avgTagDist/ideal_detection_range;  
             m_poseEstimator.addVisionMeasurement(
@@ -64,20 +68,23 @@ public class VisionSubsystem extends SubsystemBase {
                 VecBuilder.fill(stdDevs, stdDevs, 9999999)
                 );
         }
+        
         posEstimate = m_poseEstimator.getEstimatedPosition();
+        setPipeLine(this.pipeline);
+        setCamMode(this.camMode);
     }
 
     public Pose2d getEstimatedPose(){ // gobal position with blue side right as origin
         return posEstimate;
     }
 
-    public boolean hasValidTarget() {
+    public boolean hasValidAprilTarget() {
         return limelight.getEntry("tv").getDouble(0) == 1;
     }
 
     public void toggleCameraMode() {
-        int currentMode = (int) limelight.getEntry("camMode").getDouble(0);
-        setCamMode(currentMode == 0 ? 1 : 0);   // 0 is vision 1 is driver
+        this.camMode = this.camMode == 0 ? 1 : 0;
+        setCamMode(this.camMode);
     }
 
     public void setCamMode(int mode) { // 0 is vision 1 is driver
@@ -88,26 +95,30 @@ public class VisionSubsystem extends SubsystemBase {
         limelight.getEntry("pipeline").setNumber(pipeline);
     }
 
-public Double[][] getDetectorResults() { 
-    // Returns [classID, target center normalized X coord, target center normalized Y coord, percent of space taken up]
-    // normalized results between -1 and 1
-    RawDetection[] results = LimelightHelpers.getRawDetections("limelight");
-    targetCount = results.length;
-    if (results.length == 0) return new Double[0][0];
-    
-    Double[][] detections = new Double[results.length][4];
-    
-    for (int i = 0; i < results.length; i++) {
-        RawDetection detection = results[i];
-        detections[i] = new Double[] {
-            (double) detection.classId,
-            detection.txnc, 
-            detection.tync,
-            detection.ta 
-        };
-    }
-    
-    return detections;
+    public Double[][] getDetectorResults() { 
+        // Returns [classID, target center normalized X coord, target center normalized Y coord, percent of space taken up]
+        // normalized results between -1 and 1
+        this.setPipeLine(0);
+        this.setCamMode(0);
+        RawDetection[] results = LimelightHelpers.getRawDetections("limelight");
+        targetCount = results.length;
+        if (results.length == 0) return new Double[0][0];
+        
+        Double[][] detections = new Double[results.length][4];
+        
+        for (int i = 0; i < results.length; i++) {
+            RawDetection detection = results[i];
+            detections[i] = new Double[] {
+                (double) detection.classId,
+                detection.txnc, 
+                detection.tync,
+                detection.ta 
+            };
+        }
+        
+        this.setPipeLine(this.pipeline);
+        setCamMode(this.camMode);
+        return detections;
     }
 
     public int getTargetCount(){
@@ -116,7 +127,6 @@ public Double[][] getDetectorResults() {
 
     @Override
     public void periodic() {
-        setPipeLine(1);
         updateEstimatedPose();
     }
 }
