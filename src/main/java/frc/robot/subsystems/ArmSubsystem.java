@@ -3,40 +3,55 @@ package frc.robot.subsystems;
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import com.revrobotics.RelativeEncoder;
-import com.revrobotics.SparkMaxPIDController;
 import com.revrobotics.CANSparkMax.IdleMode;
+
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.ArmFeedforward;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+
+import frc.robot.Constants.ArmConstants;
 
 public class ArmSubsystem extends SubsystemBase {
     private final CANSparkMax armMotor;
     private final RelativeEncoder encoder;
-    private final SparkMaxPIDController pid;
 
-    private static final int ARM_MOTOR_ID = 10;
-    private static final double SCORING_ANGLE = 30.0;
-    private static final double RESTING_ANGLE = 0.0;
+    private final PIDController pid = new PIDController(
+        ArmConstants.kP,
+        ArmConstants.kI,
+        ArmConstants.kD
+    );
+
+    private final ArmFeedforward ff = new ArmFeedforward(
+        ArmConstants.kS,
+        ArmConstants.kG,
+        ArmConstants.kV
+    );
+
+    private double targetAngle = ArmConstants.RESTING_ANGLE;
 
     public ArmSubsystem() {
-        armMotor = new CANSparkMax(ARM_MOTOR_ID, MotorType.kBrushless);
+        armMotor = new CANSparkMax(ArmConstants.ARM_MOTOR_ID, MotorType.kBrushless);
         encoder = armMotor.getEncoder();
-        pid = armMotor.getPIDController();
 
         armMotor.setIdleMode(IdleMode.kBrake);
-        encoder.setPosition(0);
-
-        pid.setP(0.01);
-        pid.setI(0.0);
-        pid.setD(0.0);
-        pid.setFF(0.0);
-
-        pid.setOutputRange(-1.0, 1.0);
+        encoder.setPosition(0.0);
     }
 
     public void moveToScoringPosition() {
-        pid.setReference(SCORING_ANGLE, CANSparkMax.ControlType.kPosition);
+        targetAngle = ArmConstants.SCORING_ANGLE;
     }
 
     public void moveToRestingPosition() {
-        pid.setReference(RESTING_ANGLE, CANSparkMax.ControlType.kPosition);
+        targetAngle = ArmConstants.RESTING_ANGLE;
+    }
+
+    @Override
+    public void periodic() {
+        double currentPos = encoder.getPosition();
+        double pidOutput = pid.calculate(currentPos, targetAngle);
+        double ffOutput = ff.calculate(targetAngle, 0);
+        double totalOutput = pidOutput + ffOutput;
+
+        armMotor.setVoltage(totalOutput);
     }
 }
