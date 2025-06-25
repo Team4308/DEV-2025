@@ -38,4 +38,24 @@ public final class Constants {
         public static final double kG = 0.5;
         public static final double kV = 0.0;
     }
+
+    public static final class DriveConstants {
+        public static final double trackWidthMeters = 0.6; // update for your robot
+        public static final int leftEncoderChannelA = 4;
+        public static final int leftEncoderChannelB = 5;
+        public static final int rightEncoderChannelA = 6;
+        public static final int rightEncoderChannelB = 7;
+    }
+
+    public static final class Vision {
+        public static final String LIMELIGHT_TABLE_NAME = "limelight";
+        public static final double camOffsetFront = 0;
+        public static final double camOffsetSide = 0;
+        public static final double camOffsetUp = 0;
+        public static final double camOffsetPitch = 0;
+        public static final double camOffsetRoll = 0;
+        public static final double camOffsetYaw = 0;
+        public static final double idealDetectionRange = 10;
+        public static final double maxGyroRate = 360.0;
+    }
 }

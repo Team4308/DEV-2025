@@ -5,7 +5,7 @@
 package frc.robot;
 
 import frc.robot.Constants.Intake;
-import frc.robot.commands.ScoreL1Command;
+import frc.robot.commands.CoralScoringCommand;
 import frc.robot.commands.intake;
 import frc.robot.subsystems.ArmSubsystem;
 import frc.robot.subsystems.DriveSystem;
@@ -25,10 +25,10 @@ import frc.robot.subsystems.EndEffectorSubsystem;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 
 public class RobotContainer {
-  private final EndEffectorSubsystem m_intakeSubsystem;
-  private final DriveSystem m_driveSystem;
-  private final ArmSubsystem armSubsystem;
-  private final DifferentialDrive m_robotDrive;
+  private final EndEffectorSubsystem m_intakeSubsystem = new EndEffectorSubsystem();
+  private final DriveSystem m_driveSystem = new DriveSystem();
+  private final ArmSubsystem m_armSubsystem = new ArmSubsystem();
+  private final DifferentialDrive m_robotDrive = new DifferentialDrive(m_driveSystem.leaderLeft, m_driveSystem.leaderRight);
 
   private final XBoxWrapper driver = new XBoxWrapper(Ports.Joysticks.DRIVER);
   private final XBoxWrapper operator = new XBoxWrapper(Ports.Joysticks.OPERATOR);
@@ -36,12 +36,7 @@ public class RobotContainer {
 
   public RobotContainer() {
     // Register subsystems
-    m_intakeSubsystem = new EndEffectorSubsystem();
-    m_driveSystem = new DriveSystem();
-    m_robotDrive = new DifferentialDrive(m_driveSystem.leaderLeft, m_driveSystem.leaderRight);
-    armSubsystem = new ArmSubsystem();
-    CommandScheduler.getInstance().registerSubsystem(armSubsystem);
-    CommandScheduler.getInstance().regis
+    CommandScheduler.getInstance().registerSubsystem(m_armSubsystem);
     CommandScheduler.getInstance().registerSubsystem(m_intakeSubsystem);
     CommandScheduler.getInstance().registerSubsystem(m_driveSystem);
     configureNamedCommands();
@@ -78,7 +73,7 @@ public class RobotContainer {
   }
 
   private void OperatorBinds() {
-    operator.Y.onTrue(new ScoreL1Command(armSubsystem, m_intakeSubsystem));
+   // operator.Y.onTrue(new CoralScoringCommand.ScoreL1Command(m_armSubsystem, m_intakeSubsystem));
     operator.A.onTrue(new InstantCommand(() -> m_intakeSubsystem.intake()));
     operator.A.onFalse(new InstantCommand(() -> m_intakeSubsystem.stop()));
     operator.B.onTrue(new InstantCommand(() -> m_intakeSubsystem.outtake()));
