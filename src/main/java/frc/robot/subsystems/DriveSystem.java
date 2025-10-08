@@ -23,11 +23,16 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
+import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
+import edu.wpi.first.wpilibj.ADXRS450_Gyro;
+import edu.wpi.first.wpilibj.SPI;
 import frc.robot.Constants;
 import frc.robot.FieldLayout;
 import com.studica.frc.AHRS;
 import com.studica.frc.AHRS.NavXComType;
 import com.pathplanner.lib.auto.AutoBuilder;
+
 public class DriveSystem extends SubsystemBase {
     public static WPI_TalonSRX leaderLeft, leaderRight;
     private final WPI_TalonSRX followerLeft1, followerRight1, followerLeft2, followerRight2;
@@ -37,15 +42,17 @@ public class DriveSystem extends SubsystemBase {
     private DifferentialDriveOdometry m_odometry;
     public static Simulation simulation;
     private RobotConfig config;
-  private Pose2d targetPose = new Pose2d();
+    private Pose2d targetPose = new Pose2d();
 
-  public Pose2d nearestPoseToLeftReef = new Pose2d();
-  public Pose2d nearestPoseToRightReef = new Pose2d();
-  public Pose2d nearestPoseToAlgaeRemove = new Pose2d();
-  public Pose2d nearestPoseToFarCoralStation = new Pose2d();
-  public Pose2d nearestPoseToNearCoralStation = new Pose2d();
+    public Pose2d nearestPoseToLeftReef = new Pose2d();
+    public Pose2d nearestPoseToRightReef = new Pose2d();
+    public Pose2d nearestPoseToAlgaeRemove = new Pose2d();
+    public Pose2d nearestPoseToFarCoralStation = new Pose2d();
+    public Pose2d nearestPoseToNearCoralStation = new Pose2d();
 
-
+    private final ADXRS450_Gyro gyro = new ADXRS450_Gyro(SPI.Port.kOnboardCS0);
+    private final DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(Constants.DriveConstants.trackWidthMeters);
+    private DifferentialDrivePoseEstimator poseEstimator;
 
     public DriveSystem() {
         leaderLeft = new WPI_TalonSRX(Constants.Mapping.Drive.Left);
@@ -61,20 +68,19 @@ public class DriveSystem extends SubsystemBase {
         leftEncoder = new Encoder(Constants.DriveConstants.leftEncoderChannelA, Constants.DriveConstants.leftEncoderChannelB);
         rightEncoder = new Encoder(Constants.DriveConstants.rightEncoderChannelA, Constants.DriveConstants.rightEncoderChannelB);
 
-
         setNeutralMode(NeutralMode.Brake);
         
         diffDrive = new DifferentialDrive(leaderLeft, leaderRight);
         diffDrive.setSafetyEnabled(false);
         
-        leaderLeft.configNominalOutputForward(0);
-        leaderLeft.configNominalOutputReverse(0);
-        leaderLeft.configPeakOutputForward(1.0);
-        leaderLeft.configPeakOutputReverse(-1.0);
-        leaderRight.configNominalOutputForward(0);
-        leaderRight.configNominalOutputReverse(0);
-        leaderRight.configPeakOutputForward(1.0);
-        leaderRight.configPeakOutputReverse(-1.0);
+        leaderLeft.configNominalOutputForward(Constants.DriveConstants.nominalOutputForward);
+        leaderLeft.configNominalOutputReverse(Constants.DriveConstants.nominalOutputReverse);
+        leaderLeft.configPeakOutputForward(Constants.DriveConstants.peakOutputForward);
+        leaderLeft.configPeakOutputReverse(Constants.DriveConstants.peakOutputReverse);
+        leaderRight.configNominalOutputForward(Constants.DriveConstants.nominalOutputForward);
+        leaderRight.configNominalOutputReverse(Constants.DriveConstants.nominalOutputReverse);
+        leaderRight.configPeakOutputForward(Constants.DriveConstants.peakOutputForward);
+        leaderRight.configPeakOutputReverse(Constants.DriveConstants.peakOutputReverse);
 
         leaderRight.setInverted(true);
         followerRight1.setInverted(true);
@@ -89,6 +95,16 @@ public class DriveSystem extends SubsystemBase {
             simulation = new Simulation(leaderLeft, leaderRight, leftEncoder, rightEncoder);
         }
 
+        gyro.reset();
+
+        poseEstimator = new DifferentialDrivePoseEstimator(
+            kinematics,
+            getHeading(),
+            getLeftDistanceMeters(),
+            getRightDistanceMeters(),
+            new Pose2d()
+        );
+
         try {
         config = RobotConfig.fromGUISettings();
         } catch (Exception e) {
@@ -99,7 +115,7 @@ public class DriveSystem extends SubsystemBase {
             pose -> resetHeading(), 
             this::getRobotRelativeSpeeds, 
             (speeds, feedforwards) -> driveRobotRelative(speeds), 
-            new PPLTVController(0.02), 
+            new PPLTVController(Constants.DriveConstants.ltvUpdatePeriodSec), 
             config, 
             () -> {
 
@@ -120,7 +136,8 @@ public class DriveSystem extends SubsystemBase {
             getLeftDistanceMeters(),
             getRightDistanceMeters()
         );
-        
+
+        poseEstimator.update(getHeading(), getLeftDistanceMeters(), getRightDistanceMeters());
     }
 
     public void setPowerPercent(double left, double right) {
@@ -132,8 +149,6 @@ public class DriveSystem extends SubsystemBase {
         
     }
     
-
-
     public void StopControllers() {
         leaderLeft.set(TalonSRXControlMode.PercentOutput, 0);
         leaderRight.set(TalonSRXControlMode.PercentOutput, 0);
@@ -164,7 +179,15 @@ public class DriveSystem extends SubsystemBase {
         if (RobotBase.isSimulation() && simulation != null) {
             return simulation.getPose();
         }
-        return m_odometry.getPoseMeters();
+        return poseEstimator.getEstimatedPosition();
+    }
+
+    public void resetPose(Pose2d pose) {
+        poseEstimator.resetPosition(getHeading(), getLeftDistanceMeters(), getRightDistanceMeters(), pose);
+    }
+
+    public void addVisionMeasurement(Pose2d visionPose, double timestampSeconds) {
+        poseEstimator.addVisionMeasurement(visionPose, timestampSeconds);
     }
 
     public double getHeading() {
@@ -227,8 +250,8 @@ public class DriveSystem extends SubsystemBase {
         double forward = speeds.vxMetersPerSecond;
         double rotation = speeds.omegaRadiansPerSecond;
 
-        double maxSpeed = 3.0; // meters per sec
-        double maxAngular = Math.PI; // rad per sec
+        double maxSpeed = Constants.DriveConstants.maxLinearSpeedMps;
+        double maxAngular = Constants.DriveConstants.maxAngularSpeedRadPerSec;
 
         double forwardPercent = Math.max(-1.0, Math.min(1.0, forward / maxSpeed));
         double rotationPercent = Math.max(-1.0, Math.min(1.0, rotation / maxAngular));
@@ -339,7 +362,12 @@ public class DriveSystem extends SubsystemBase {
         
         public Command driveToPose(Pose2d pose) {
         targetPose = pose;
-        PathConstraints constraints = new PathConstraints(3.0, 3.0, Math.PI, 3.0);
+        PathConstraints constraints = new PathConstraints(
+            Constants.DriveConstants.pathMaxVelMps,
+            Constants.DriveConstants.pathMaxAccelMps2,
+            Constants.DriveConstants.pathMaxAngularVelRadPerSec,
+            Constants.DriveConstants.pathMaxAngularAccelRadPerSec2
+        );
         List<Waypoint> waypoints = PathPlannerPath.waypointsFromPoses(getPose(), pose);
         PathPlannerPath path = new PathPlannerPath(
 

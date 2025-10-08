@@ -29,7 +29,7 @@ public class RobotContainer {
   private final EndEffectorSubsystem m_intakeSubsystem = new EndEffectorSubsystem();
   private final DriveSystem m_driveSystem = new DriveSystem();
   private final ArmSubsystem m_armSubsystem = new ArmSubsystem();
-  private final VisionSubsystem m_Vision = new VisionSubsystem(m_driveSystem.leftEncoder, m_driveSystem.rightEncoder);
+  private final VisionSubsystem m_Vision = new VisionSubsystem(m_driveSystem);
   @SuppressWarnings("static-access")
   private final DifferentialDrive m_robotDrive = new DifferentialDrive(m_driveSystem.leaderLeft, m_driveSystem.leaderRight);
 
@@ -56,6 +56,12 @@ public class RobotContainer {
   }
 
   private void DriverBinds() {
+
+
+    driver.RB.onTrue(new InstantCommand(() -> m_driveSystem.driveToPose(m_driveSystem.nearestPoseToRightReef)));
+    driver.LB.onTrue(new InstantCommand(() -> m_driveSystem.driveToPose(m_driveSystem.nearestPoseToLeftReef)));
+
+
     m_driveSystem.setDefaultCommand(
       new RunCommand(
         () -> {

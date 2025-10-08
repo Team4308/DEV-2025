@@ -16,19 +16,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants;
 import frc.robot.subsystems.Vision.LimelightHelpers.RawDetection;
 import frc.robot.subsystems.DriveSystem;
-import edu.wpi.first.apriltag.AprilTagFieldLayout;
-import edu.wpi.first.apriltag.AprilTagFields;
-import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.geometry.Transform3d;
-import edu.wpi.first.math.geometry.Translation3d;
-import edu.wpi.first.wpilibj.RobotBase;
-import org.photonvision.PhotonCamera;
-import org.photonvision.PhotonPoseEstimator;
-import org.photonvision.PhotonPoseEstimator.PoseStrategy;
-import org.photonvision.simulation.PhotonCameraSim;
-import org.photonvision.simulation.SimCameraProperties;
-import org.photonvision.simulation.VisionSystemSim;
-
+import edu.wpi.first.wpilibj.Timer;
 
 public class VisionSubsystem extends SubsystemBase {
     // Hardware & Estimator
@@ -47,15 +35,13 @@ public class VisionSubsystem extends SubsystemBase {
     private Pose2d lastEstimatedPose;
     private int lastTargetCount;
 
-     // Sim 
+    private double prevLeftDistance = 0.0;
+    private double prevRightDistance = 0.0;
 
+    private double nextSimVisionTime = 0.0;
+    private double lastSimVisionTimestamp = -1.0;
 
-    private PhotonCamera photonCamera;
-    private PhotonPoseEstimator photonEstimator;
-    private VisionSystemSim visionSim;
-    private Transform3d robotToCam3d;
-    private AprilTagFieldLayout tagLayout;
-    private SimCameraProperties simCamProps;
+    private final DriveSystem drive;
 
     /**enum for limelight network table camera mode configuration. CameraMode.VISION or CameraMode.DRIVER*/
     public enum CameraMode { VISION(0), DRIVER(1); public final int value; CameraMode(int v) { value = v; }}
@@ -66,22 +52,35 @@ public class VisionSubsystem extends SubsystemBase {
 
 
     /** Constructor: configure sensors, estimator, and Limelight */
-    public VisionSubsystem(Encoder leftEncoder, Encoder rightEncoder) {
+    public VisionSubsystem(DriveSystem drive) {
         // Initialize kinematics and sensors
         kinematics = new DifferentialDriveKinematics(Constants.DriveConstants.trackWidthMeters);
         gyro = DriveSystem.imu;
-        this.leftEncoder = leftEncoder;
-        this.rightEncoder = rightEncoder;
-    
-        // Configure pose estimator
+        this.drive = drive;
+        this.leftEncoder = drive.leftEncoder;
+        this.rightEncoder = drive.rightEncoder;
+
+        // Initialize previous encoder distances
+        prevLeftDistance = leftEncoder.getDistance();
+        prevRightDistance = rightEncoder.getDistance();
+
+        // Configure pose estimator with noise from constants
         poseEstimator = new DifferentialDrivePoseEstimator(
             kinematics,
             gyro.getRotation2d(),
             leftEncoder.getDistance(),
             rightEncoder.getDistance(),
             new Pose2d(),
-            VecBuilder.fill(0.05, 0.05, Units.degreesToRadians(5)),   // state std devs
-            VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(20))    // vision meas std devs
+            VecBuilder.fill(
+                Constants.Vision.stateStdDevPosMeters,
+                Constants.Vision.stateStdDevPosMeters,
+                Units.degreesToRadians(Constants.Vision.stateStdDevThetaDeg)
+            ),
+            VecBuilder.fill(
+                Constants.Vision.visionStdDevPosMeters,
+                Constants.Vision.visionStdDevPosMeters,
+                Units.degreesToRadians(Constants.Vision.visionStdDevThetaDeg)
+            )
         );
 
         // general setup
@@ -104,45 +103,6 @@ public class VisionSubsystem extends SubsystemBase {
             Constants.Vision.camOffsetPitch,
             Constants.Vision.camOffsetYaw
         );
-        
-        if (RobotBase.isSimulation()) {
-            try {
-                // Adjust field if needed
-                tagLayout = AprilTagFields.k2025Reefscape.loadAprilTagLayoutField();
-            } catch (Exception e) {
-            }
-
-            robotToCam3d = new Transform3d(
-                new Translation3d(
-                    Constants.Vision.camOffsetFront,
-                    Constants.Vision.camOffsetSide,
-                    Constants.Vision.camOffsetUp
-                ),
-                new Rotation3d(
-                    Units.degreesToRadians(Constants.Vision.camOffsetRoll),
-                    Units.degreesToRadians(Constants.Vision.camOffsetPitch),
-                    Units.degreesToRadians(Constants.Vision.camOffsetYaw)
-                )
-            );
-
-            photonCamera = new PhotonCamera("photonvision");
-            photonEstimator = new PhotonPoseEstimator(
-                tagLayout,
-                PoseStrategy.AVERAGE_BEST_TARGETS,
-                robotToCam3d
-            );
-
-            PhotonCameraSim photonCameraSim = new PhotonCameraSim(photonCamera);
-            simCamProps = new SimCameraProperties();
-            simCamProps.setCalibration(960, 720, new Rotation2d(Units.degreesToRadians(90.0)));
-            simCamProps.setFPS(Constants.Simulation.Camera.fps);
-            simCamProps.setAvgLatencyMs(Constants.Simulation.Camera.AvgLatencyMs);
-            simCamProps.setLatencyStdDevMs(Constants.Simulation.Camera.LatencyStdDevMs);    
-
-            visionSim = new VisionSystemSim("SimPV");
-            visionSim.addAprilTags(tagLayout);
-            visionSim.addCamera(photonCameraSim, robotToCam3d);
-        }
     }
 
     // -----------------------------------------------------------------------
@@ -163,24 +123,38 @@ public class VisionSubsystem extends SubsystemBase {
             leftDist,
             rightDist
         );
-
+        prevLeftDistance = leftDist;
+        prevRightDistance = rightDist;
 
         // --- VISION UPDATE ---
         switchPipeline(Pipeline.APRIL_TAGS);
         switchCameraMode(CameraMode.VISION);
 
         if (edu.wpi.first.wpilibj.RobotBase.isSimulation()) {
-            var result = photonCamera != null ? photonCamera.getLatestResult() : null;
-            if (result != null && result.hasTargets()) {
-                var estOpt = photonEstimator.update(result);
-                if (estOpt.isPresent()) {
-                    var est = estOpt.get();
+            double[] botpose = limelightTable.getEntry("botpose_wpiblue").getDoubleArray(new double[0]);
+            SmartDashboard.putNumberArray("LL Raw BotPose", botpose);
+            double tv = limelightTable.getEntry("tv").getDouble(0.0);
+
+            if (tv >= 1.0 && botpose.length >= 7) {
+                Pose2d simPose = new Pose2d(
+                    botpose[0], // x (m)
+                    botpose[1], // y (m)
+                    Rotation2d.fromDegrees(botpose[5]) // yaw (deg)
+                );
+                double latencySec = botpose[6] / 1000.0;
+                double ts = Timer.getFPGATimestamp() - latencySec;
+
+                if (ts > lastSimVisionTimestamp) {
                     poseEstimator.addVisionMeasurement(
-                        est.estimatedPose.toPose2d(),
-                        est.timestampSeconds,
-                        VecBuilder.fill(0.3, 0.3, Units.degreesToRadians(5))
+                        simPose,
+                        ts,
+                        VecBuilder.fill(
+                            Constants.Vision.simVisionStdDevPosMeters,
+                            Constants.Vision.simVisionStdDevPosMeters,
+                            Units.degreesToRadians(Constants.Vision.simVisionStdDevThetaDeg)
+                        )
                     );
-                    SmartDashboard.putString("LL Vision Status", "Photon sim vision used");
+                    lastSimVisionTimestamp = ts;
                 }
             }
         } else {
@@ -192,6 +166,14 @@ public class VisionSubsystem extends SubsystemBase {
             SmartDashboard.putNumberArray("LL Raw BotPose", botpose);
 
             if (visionResult != null) {
+                // Debug: Output vision pose and timestamp
+                SmartDashboard.putNumber("LL Vision X", visionResult.pose.getX());
+                SmartDashboard.putNumber("LL Vision Y", visionResult.pose.getY());
+                SmartDashboard.putNumber("LL Vision Rot", visionResult.pose.getRotation().getDegrees());
+                SmartDashboard.putNumber("LL Vision Timestamp", visionResult.timestampSeconds);
+                SmartDashboard.putNumber("LL Vision TagCount", visionResult.tagCount);
+
+                // Only use vision if pose is not zero and at least one tag is detected
                 boolean validVision = hasValidAprilTarget()
                     && Math.abs(gyro.getRate()) < Constants.Vision.maxGyroRate
                     && visionResult.tagCount > 0
@@ -204,8 +186,10 @@ public class VisionSubsystem extends SubsystemBase {
                         visionResult.timestampSeconds,
                         VecBuilder.fill(measStd, measStd, Double.MAX_VALUE)
                     );
+                    onNewVisionPose(visionResult.pose);
                 }
             } else {
+                // Only show "No vision result" if not in simulation
                 if (!edu.wpi.first.wpilibj.RobotBase.isSimulation()) {
                     SmartDashboard.putString("LL Vision Status", "No vision result");
                 }
@@ -279,6 +263,11 @@ public class VisionSubsystem extends SubsystemBase {
         switchCameraMode(currentCamMode);
     }
 
+    private void onNewVisionPose(Pose2d estimatedPose) {
+        double ts = Timer.getFPGATimestamp();
+        drive.addVisionMeasurement(estimatedPose, ts);
+    }
+
     @Override
     public void periodic() {
         // Always update pose estimator with odometry and vision
@@ -317,12 +306,35 @@ public class VisionSubsystem extends SubsystemBase {
             leftDist,
             rightDist
         );
+        prevLeftDistance = leftDist;
+        prevRightDistance = rightDist;
 
-        if (visionSim != null) {
-            Pose2d pose2d = poseEstimator.getEstimatedPosition();
-            visionSim.update(pose2d);
+        // Publish a simulated Limelight pose to NT at configured rate
+        double now = Timer.getFPGATimestamp();
+        if (now >= nextSimVisionTime) {
+            Pose2d simVisionPose = poseEstimator.getEstimatedPosition();
+            pushSimLimelightPose(simVisionPose, Constants.Vision.simLatencyMs);
+            nextSimVisionTime = now + Constants.Vision.simUpdatePeriodSec;
         }
 
         lastEstimatedPose = poseEstimator.getEstimatedPosition();
+    }
+
+    private void pushSimLimelightPose(Pose2d pose, double latencyMs) {
+        // Populate NT entries to emulate Limelight outputs
+        double[] arr = new double[] {
+            pose.getX(),                       // X (m)
+            pose.getY(),                       // Y (m)
+            0.0,                               // Z (m)
+            0.0,                               // roll (deg)
+            0.0,                               // pitch (deg)
+            pose.getRotation().getDegrees(),   // yaw (deg)
+            latencyMs                          // latency (ms)
+        };
+        limelightTable.getEntry("tv").setDouble(1.0);
+        limelightTable.getEntry("botpose_wpiblue").setDoubleArray(arr);
+        limelightTable.getEntry("pipeline").setNumber(Pipeline.APRIL_TAGS.value);
+        limelightTable.getEntry("camMode").setNumber(CameraMode.VISION.value);
+        SmartDashboard.putString("LL Vision Status", "Simulated vision injected");
     }
 }

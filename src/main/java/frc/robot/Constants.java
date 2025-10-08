@@ -66,6 +66,25 @@ public final class Constants {
         public static final int rightEncoderChannelA = 13;
         public static final int rightEncoderChannelB = 11;
 
+        // Output limits
+        public static final double nominalOutputForward = 0.0;
+        public static final double nominalOutputReverse = 0.0;
+        public static final double peakOutputForward = 1.0;
+        public static final double peakOutputReverse = -1.0;
+
+        // Max robot speeds (used for teleop scaling)
+        public static final double maxLinearSpeedMps = 3.0;
+        public static final double maxAngularSpeedRadPerSec = Math.PI;
+
+        // Path planning constraints
+        public static final double pathMaxVelMps = 3.0;
+        public static final double pathMaxAccelMps2 = 3.0;
+        public static final double pathMaxAngularVelRadPerSec = Math.PI;
+        public static final double pathMaxAngularAccelRadPerSec2 = 3.0;
+
+        // Controllers
+        public static final double ltvUpdatePeriodSec = 0.02;
+
         // Tolerances
         public static final int HeadingTolerance = 3; // degrees
     }
@@ -80,5 +99,17 @@ public final class Constants {
         public static final double camOffsetYaw = 0;
         public static final double idealDetectionRange = 10;
         public static final double maxGyroRate = 360.0;
+
+        // Estimator process/measurement noise (base)
+        public static final double stateStdDevPosMeters = 0.05;
+        public static final double stateStdDevThetaDeg = 5.0;
+        public static final double visionStdDevPosMeters = 0.5;
+        public static final double visionStdDevThetaDeg = 20.0;
+
+        // Simulation vision config
+        public static final double simVisionStdDevPosMeters = 0.3;
+        public static final double simVisionStdDevThetaDeg = 5.0;
+        public static final double simUpdatePeriodSec = 0.05;  // ~20 Hz
+        public static final double simLatencyMs = 110.0;
     }
 }
