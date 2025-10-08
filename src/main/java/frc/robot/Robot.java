@@ -8,6 +8,9 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+
+import java.util.function.BooleanSupplier;
+
 import edu.wpi.first.wpilibj.RobotController;
 
 public class Robot extends TimedRobot {
@@ -20,15 +23,14 @@ public class Robot extends TimedRobot {
 
   @Override
   public void robotInit() {
-    SmartDashboard.putNumber("Battery Voltage", RobotController.getBatteryVoltage());
-        SmartDashboard.putBoolean("Simulation Mode", isSimulation());
+   
   }
 
   @Override
   public void robotPeriodic() {
     CommandScheduler.getInstance().run();
     
-    SmartDashboard.putNumber("Battery Voltage", RobotController.getBatteryVoltage());
+    SmartDashboard.putBoolean("Intake From Ground", ((BooleanSupplier) () -> RobotContainer.groundIntake()).getAsBoolean());
   }
 
   @Override
@@ -81,7 +83,6 @@ public class Robot extends TimedRobot {
 
   @Override
   public void simulationInit() {
-    SmartDashboard.putString("Simulation Status", "Initialized");
   }
 
   @Override

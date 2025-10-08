@@ -1,23 +1,27 @@
 package frc.robot.subsystems;
 
-import com.ctre.phoenix.motorcontrol.TalonSRXControlMode;
-import com.ctre.phoenix.motorcontrol.can.TalonSRX;
-import com.ctre.phoenix.motorcontrol.can.TalonSRXConfiguration;
+
+import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.NeutralModeValue;
+import edu.wpi.first.wpilibj.DigitalInput;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.Intake;
 
 public class EndEffectorSubsystem extends SubsystemBase  {
-    private final TalonSRX intakeMotor = new TalonSRX(Intake.Intake_Motor_id);
-
-
+    private final TalonFX intakeMotor = new TalonFX(Intake.Intake_Motor_id);
+    public final DigitalInput intakeSensor = new DigitalInput(Intake.Intake_Sensor_id);
 
     public EndEffectorSubsystem() {
-        TalonSRXConfiguration config = new TalonSRXConfiguration();
-        config.slot0.kP = 0.12;
-        config.slot0.kI = 0.11;
-        config.slot0.kD = 0.5;
-        config.slot0.kF = 0.001;
-        intakeMotor.configAllSettings(config);
+        TalonFXConfiguration config = new TalonFXConfiguration();
+        config.Slot0.kP = Intake.kP;
+        config.Slot0.kI = Intake.kI;
+        config.Slot0.kD = Intake.kD;
+
+        
+        intakeMotor.setNeutralMode(NeutralModeValue.Brake);
+        intakeMotor.getConfigurator().apply(config);
     }
 
     public void setInverted(boolean inverted) {
@@ -25,19 +29,28 @@ public class EndEffectorSubsystem extends SubsystemBase  {
     }
 
     public void setMotorSpeed(double percent) {
-        intakeMotor.set(TalonSRXControlMode.PercentOutput,percent);
+
+        intakeMotor.set(percent);
     }
     public void stop() {
-        intakeMotor.set(TalonSRXControlMode.PercentOutput, 0);
+        intakeMotor.set(0);
     }
 
 
     public void intake() {
-        setMotorSpeed(25);
+        setMotorSpeed(0.25);
     }
 
     public void outtake() {
-        setMotorSpeed(-25);
+        setMotorSpeed(-0.25);
     }
 
+    @Override
+    public void periodic() {
+        SmartDashboard.putBoolean("Coral Intook", intakeSensor.get());
+        SmartDashboard.putNumber("Intake Motor Speed", intakeMotor.get());
+        if (intakeSensor.get()) {
+            stop();
+        }
+    }
 }

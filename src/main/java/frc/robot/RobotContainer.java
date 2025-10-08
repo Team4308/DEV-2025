@@ -4,9 +4,9 @@
 
 package frc.robot;
 
-import frc.robot.Constants.Intake;
-import frc.robot.commands.CoralScoringCommand;
-import frc.robot.commands.intake;
+
+import frc.robot.commands.score;
+import frc.robot.commands.Sequential.CoralIntakeCommand;
 import frc.robot.subsystems.ArmSubsystem;
 import frc.robot.subsystems.DriveSystem;
 
@@ -18,16 +18,19 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import frc.robot.subsystems.EndEffectorSubsystem;
+import frc.robot.subsystems.Vision.VisionSubsystem;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 
 public class RobotContainer {
+  public static boolean groundIntake = false; 
   private final EndEffectorSubsystem m_intakeSubsystem = new EndEffectorSubsystem();
   private final DriveSystem m_driveSystem = new DriveSystem();
   private final ArmSubsystem m_armSubsystem = new ArmSubsystem();
+  private final VisionSubsystem m_Vision = new VisionSubsystem(m_driveSystem.leftEncoder, m_driveSystem.rightEncoder);
+  @SuppressWarnings("static-access")
   private final DifferentialDrive m_robotDrive = new DifferentialDrive(m_driveSystem.leaderLeft, m_driveSystem.leaderRight);
 
   private final XBoxWrapper driver = new XBoxWrapper(Ports.Joysticks.DRIVER);
@@ -39,6 +42,7 @@ public class RobotContainer {
     CommandScheduler.getInstance().registerSubsystem(m_armSubsystem);
     CommandScheduler.getInstance().registerSubsystem(m_intakeSubsystem);
     CommandScheduler.getInstance().registerSubsystem(m_driveSystem);
+    CommandScheduler.getInstance().registerSubsystem(m_Vision);
     configureNamedCommands();
     configureBindings();
     
@@ -60,23 +64,34 @@ public class RobotContainer {
         
           m_robotDrive.arcadeDrive(xSpeed, zRotation, true);
 
-          SmartDashboard.putNumber("Drive Speed", xSpeed);
-          SmartDashboard.putNumber("Drive Rotation", zRotation);
-          SmartDashboard.putNumber("Robot Heading", m_driveSystem.getHeading());
+
         },
         m_driveSystem
       )
     );
   }
   public void configureNamedCommands() {
-    NamedCommands.registerCommand("l1", new intake(m_intakeSubsystem));
+    NamedCommands.registerCommand("intake", new CoralIntakeCommand(m_intakeSubsystem, m_armSubsystem, groundIntake));
+    NamedCommands.registerCommand("score", new score(m_intakeSubsystem, m_armSubsystem));
   }
 
   private void OperatorBinds() {
-   // operator.Y.onTrue(new CoralScoringCommand.ScoreL1Command(m_armSubsystem, m_intakeSubsystem));
-    operator.A.onTrue(new InstantCommand(() -> m_intakeSubsystem.intake()));
-    operator.A.onFalse(new InstantCommand(() -> m_intakeSubsystem.stop()));
-    operator.B.onTrue(new InstantCommand(() -> m_intakeSubsystem.outtake()));
+
+   // If we dont have a coral try to intake it. If we do have a coral score it.
+
+   // This could also just all be in driver. Change ltr
+   operator.B.onTrue(new InstantCommand(() -> { groundIntake = !groundIntake;  }));
+
+   if (!m_intakeSubsystem.intakeSensor.get()) { 
+    operator.A.onTrue(new CoralIntakeCommand(m_intakeSubsystem, m_armSubsystem, groundIntake));
+   } else {
+    operator.A.onTrue(new score(m_intakeSubsystem, m_armSubsystem));
+   }
+
+  }
+
+  public static boolean groundIntake() {
+    return groundIntake;
   }
 
   public Command getAutonomousCommand() {

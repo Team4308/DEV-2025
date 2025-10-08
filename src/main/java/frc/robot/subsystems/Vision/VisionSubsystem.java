@@ -1,11 +1,13 @@
 package frc.robot.subsystems.Vision;
 
+import com.studica.frc.AHRS;
+
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.wpilibj.ADXRS450_Gyro;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.networktables.NetworkTable;
@@ -13,12 +15,25 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants;
 import frc.robot.subsystems.Vision.LimelightHelpers.RawDetection;
+import frc.robot.subsystems.DriveSystem;
+import edu.wpi.first.apriltag.AprilTagFieldLayout;
+import edu.wpi.first.apriltag.AprilTagFields;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.wpilibj.RobotBase;
+import org.photonvision.PhotonCamera;
+import org.photonvision.PhotonPoseEstimator;
+import org.photonvision.PhotonPoseEstimator.PoseStrategy;
+import org.photonvision.simulation.PhotonCameraSim;
+import org.photonvision.simulation.SimCameraProperties;
+import org.photonvision.simulation.VisionSystemSim;
 
 
 public class VisionSubsystem extends SubsystemBase {
     // Hardware & Estimator
     private final DifferentialDriveKinematics kinematics;
-    private final ADXRS450_Gyro gyro;
+    public final AHRS gyro;
     private final Encoder leftEncoder;
     private final Encoder rightEncoder;
     private final DifferentialDrivePoseEstimator poseEstimator;
@@ -32,6 +47,16 @@ public class VisionSubsystem extends SubsystemBase {
     private Pose2d lastEstimatedPose;
     private int lastTargetCount;
 
+     // Sim 
+
+
+    private PhotonCamera photonCamera;
+    private PhotonPoseEstimator photonEstimator;
+    private VisionSystemSim visionSim;
+    private Transform3d robotToCam3d;
+    private AprilTagFieldLayout tagLayout;
+    private SimCameraProperties simCamProps;
+
     /**enum for limelight network table camera mode configuration. CameraMode.VISION or CameraMode.DRIVER*/
     public enum CameraMode { VISION(0), DRIVER(1); public final int value; CameraMode(int v) { value = v; }}
 
@@ -41,13 +66,13 @@ public class VisionSubsystem extends SubsystemBase {
 
 
     /** Constructor: configure sensors, estimator, and Limelight */
-    public VisionSubsystem() {
+    public VisionSubsystem(Encoder leftEncoder, Encoder rightEncoder) {
         // Initialize kinematics and sensors
         kinematics = new DifferentialDriveKinematics(Constants.DriveConstants.trackWidthMeters);
-        gyro = new ADXRS450_Gyro();
-        leftEncoder = new Encoder(Constants.DriveConstants.leftEncoderChannelA, Constants.DriveConstants.leftEncoderChannelB);
-        rightEncoder = new Encoder(Constants.DriveConstants.rightEncoderChannelA, Constants.DriveConstants.rightEncoderChannelB);
-        
+        gyro = DriveSystem.imu;
+        this.leftEncoder = leftEncoder;
+        this.rightEncoder = rightEncoder;
+    
         // Configure pose estimator
         poseEstimator = new DifferentialDrivePoseEstimator(
             kinematics,
@@ -79,6 +104,45 @@ public class VisionSubsystem extends SubsystemBase {
             Constants.Vision.camOffsetPitch,
             Constants.Vision.camOffsetYaw
         );
+        
+        if (RobotBase.isSimulation()) {
+            try {
+                // Adjust field if needed
+                tagLayout = AprilTagFields.k2025Reefscape.loadAprilTagLayoutField();
+            } catch (Exception e) {
+            }
+
+            robotToCam3d = new Transform3d(
+                new Translation3d(
+                    Constants.Vision.camOffsetFront,
+                    Constants.Vision.camOffsetSide,
+                    Constants.Vision.camOffsetUp
+                ),
+                new Rotation3d(
+                    Units.degreesToRadians(Constants.Vision.camOffsetRoll),
+                    Units.degreesToRadians(Constants.Vision.camOffsetPitch),
+                    Units.degreesToRadians(Constants.Vision.camOffsetYaw)
+                )
+            );
+
+            photonCamera = new PhotonCamera("photonvision");
+            photonEstimator = new PhotonPoseEstimator(
+                tagLayout,
+                PoseStrategy.AVERAGE_BEST_TARGETS,
+                robotToCam3d
+            );
+
+            PhotonCameraSim photonCameraSim = new PhotonCameraSim(photonCamera);
+            simCamProps = new SimCameraProperties();
+            simCamProps.setCalibration(960, 720, new Rotation2d(Units.degreesToRadians(90.0)));
+            simCamProps.setFPS(Constants.Simulation.Camera.fps);
+            simCamProps.setAvgLatencyMs(Constants.Simulation.Camera.AvgLatencyMs);
+            simCamProps.setLatencyStdDevMs(Constants.Simulation.Camera.LatencyStdDevMs);    
+
+            visionSim = new VisionSystemSim("SimPV");
+            visionSim.addAprilTags(tagLayout);
+            visionSim.addCamera(photonCameraSim, robotToCam3d);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -86,27 +150,66 @@ public class VisionSubsystem extends SubsystemBase {
     // -----------------------------------------------------------------------
 
     /** 
-     * Update the pose estimator with vision data if valid. 
-     * computes robot gobal position with blue side left as origin.
+     * Update the pose estimator with odometry and vision data if valid. 
+     * Computes robot global position with blue side left as origin.
      * Should be called periodically.
     */
     public void updatePose() {
-        // Temporarily force Apriltag pipeline & vision mode for measurement
+        // --- ODOMETRY UPDATE ---
+        double leftDist = leftEncoder.getDistance();
+        double rightDist = rightEncoder.getDistance();
+        poseEstimator.update(
+            gyro.getRotation2d(),
+            leftDist,
+            rightDist
+        );
+
+
+        // --- VISION UPDATE ---
         switchPipeline(Pipeline.APRIL_TAGS);
         switchCameraMode(CameraMode.VISION);
 
-        double currentRotation = poseEstimator.getEstimatedPosition().getRotation().getDegrees();
-        LimelightHelpers.SetRobotOrientation("limelight", currentRotation, 0, 0, 0, 0, 0);
-        LimelightHelpers.PoseEstimate visionResult = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(Constants.Vision.LIMELIGHT_TABLE_NAME);
+        if (edu.wpi.first.wpilibj.RobotBase.isSimulation()) {
+            var result = photonCamera != null ? photonCamera.getLatestResult() : null;
+            if (result != null && result.hasTargets()) {
+                var estOpt = photonEstimator.update(result);
+                if (estOpt.isPresent()) {
+                    var est = estOpt.get();
+                    poseEstimator.addVisionMeasurement(
+                        est.estimatedPose.toPose2d(),
+                        est.timestampSeconds,
+                        VecBuilder.fill(0.3, 0.3, Units.degreesToRadians(5))
+                    );
+                    SmartDashboard.putString("LL Vision Status", "Photon sim vision used");
+                }
+            }
+        } else {
+            double currentRotation = poseEstimator.getEstimatedPosition().getRotation().getDegrees();
+            LimelightHelpers.SetRobotOrientation("limelight", currentRotation, 0, 0, 0, 0, 0);
+            LimelightHelpers.PoseEstimate visionResult = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(Constants.Vision.LIMELIGHT_TABLE_NAME);
 
-        // Validate result
-        if (hasValidAprilTarget() && Math.abs(gyro.getRate()) < Constants.Vision.maxGyroRate) {
-            double measStd = visionResult.avgTagDist / Constants.Vision.idealDetectionRange;
-            poseEstimator.addVisionMeasurement(
-                visionResult.pose,
-                visionResult.timestampSeconds,
-                VecBuilder.fill(measStd, measStd, Double.MAX_VALUE)
-            );
+            double[] botpose = limelightTable.getEntry("botpose_wpiblue").getDoubleArray(new double[0]);
+            SmartDashboard.putNumberArray("LL Raw BotPose", botpose);
+
+            if (visionResult != null) {
+                boolean validVision = hasValidAprilTarget()
+                    && Math.abs(gyro.getRate()) < Constants.Vision.maxGyroRate
+                    && visionResult.tagCount > 0
+                    && !(visionResult.pose.getX() == 0 && visionResult.pose.getY() == 0);
+
+                if (validVision) {
+                    double measStd = visionResult.avgTagDist / Constants.Vision.idealDetectionRange;
+                    poseEstimator.addVisionMeasurement(
+                        visionResult.pose,
+                        visionResult.timestampSeconds,
+                        VecBuilder.fill(measStd, measStd, Double.MAX_VALUE)
+                    );
+                }
+            } else {
+                if (!edu.wpi.first.wpilibj.RobotBase.isSimulation()) {
+                    SmartDashboard.putString("LL Vision Status", "No vision result");
+                }
+            }
         }
 
         lastEstimatedPose = poseEstimator.getEstimatedPosition();
@@ -178,7 +281,7 @@ public class VisionSubsystem extends SubsystemBase {
 
     @Override
     public void periodic() {
-        // Optionally update pose here if not called elsewhere
+        // Always update pose estimator with odometry and vision
         updatePose();
 
         // Publish pose for AdvantageScope and SmartDashboard
@@ -202,5 +305,24 @@ public class VisionSubsystem extends SubsystemBase {
             .getEntry("IdealPose")
             .setDoubleArray(idealArr);
         SmartDashboard.putNumberArray("IdealPose", idealArr);
+    }
+
+    @Override
+    public void simulationPeriodic() {
+        // Simulate odometry update
+        double leftDist = leftEncoder.getDistance();
+        double rightDist = rightEncoder.getDistance();
+        poseEstimator.update(
+            gyro.getRotation2d(),
+            leftDist,
+            rightDist
+        );
+
+        if (visionSim != null) {
+            Pose2d pose2d = poseEstimator.getEstimatedPosition();
+            visionSim.update(pose2d);
+        }
+
+        lastEstimatedPose = poseEstimator.getEstimatedPosition();
     }
 }

@@ -7,7 +7,13 @@
         {
           "type": "path",
           "data": {
-            "pathName": "New New Path"
+            "pathName": "M"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "score"
           }
         }
       ]
