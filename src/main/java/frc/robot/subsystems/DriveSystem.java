@@ -25,8 +25,6 @@ import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
-import edu.wpi.first.wpilibj.ADXRS450_Gyro;
-import edu.wpi.first.wpilibj.SPI;
 import frc.robot.Constants;
 import frc.robot.FieldLayout;
 import com.studica.frc.AHRS;
@@ -50,7 +48,6 @@ public class DriveSystem extends SubsystemBase {
     public Pose2d nearestPoseToFarCoralStation = new Pose2d();
     public Pose2d nearestPoseToNearCoralStation = new Pose2d();
 
-    private final ADXRS450_Gyro gyro = new ADXRS450_Gyro(SPI.Port.kOnboardCS0);
     private final DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(Constants.DriveConstants.trackWidthMeters);
     private DifferentialDrivePoseEstimator poseEstimator;
 
@@ -95,11 +92,9 @@ public class DriveSystem extends SubsystemBase {
             simulation = new Simulation(leaderLeft, leaderRight, leftEncoder, rightEncoder);
         }
 
-        gyro.reset();
-
         poseEstimator = new DifferentialDrivePoseEstimator(
             kinematics,
-            getHeading(),
+            Rotation2d.fromDegrees(getHeading()),
             getLeftDistanceMeters(),
             getRightDistanceMeters(),
             new Pose2d()
@@ -137,7 +132,11 @@ public class DriveSystem extends SubsystemBase {
             getRightDistanceMeters()
         );
 
-        poseEstimator.update(getHeading(), getLeftDistanceMeters(), getRightDistanceMeters());
+        poseEstimator.update(
+            Rotation2d.fromDegrees(getHeading()),
+            getLeftDistanceMeters(),
+            getRightDistanceMeters()
+        );
     }
 
     public void setPowerPercent(double left, double right) {
@@ -183,7 +182,12 @@ public class DriveSystem extends SubsystemBase {
     }
 
     public void resetPose(Pose2d pose) {
-        poseEstimator.resetPosition(getHeading(), getLeftDistanceMeters(), getRightDistanceMeters(), pose);
+        poseEstimator.resetPosition(
+            Rotation2d.fromDegrees(getHeading()),
+            getLeftDistanceMeters(),
+            getRightDistanceMeters(),
+            pose
+        );
     }
 
     public void addVisionMeasurement(Pose2d visionPose, double timestampSeconds) {
@@ -230,7 +234,7 @@ public class DriveSystem extends SubsystemBase {
     
     public void resetHeading() {
         if (RobotBase.isSimulation() && simulation != null) {
-            simulation.getGyro().reset();
+            simulation.resetHeading();
         } else if (imu != null) {
             imu.reset();
         }

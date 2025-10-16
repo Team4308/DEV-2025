@@ -3,12 +3,9 @@ package frc.robot.subsystems.Vision;
 import com.studica.frc.AHRS;
 
 import edu.wpi.first.math.VecBuilder;
-import edu.wpi.first.math.estimator.DifferentialDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -17,14 +14,13 @@ import frc.robot.Constants;
 import frc.robot.subsystems.Vision.LimelightHelpers.RawDetection;
 import frc.robot.subsystems.DriveSystem;
 import edu.wpi.first.wpilibj.Timer;
+import static java.lang.Double.MAX_VALUE;
+import java.util.Arrays;
+import java.util.Comparator;
 
 public class VisionSubsystem extends SubsystemBase {
     // Hardware & Estimator
-    private final DifferentialDriveKinematics kinematics;
     public final AHRS gyro;
-    private final Encoder leftEncoder;
-    private final Encoder rightEncoder;
-    private final DifferentialDrivePoseEstimator poseEstimator;
 
     // NetworkTables
     private final NetworkTable limelightTable;
@@ -33,12 +29,9 @@ public class VisionSubsystem extends SubsystemBase {
     private CameraMode currentCamMode;
     private Pipeline currentPipeline;
     private Pose2d lastEstimatedPose;
+    private Pose2d lastVisionPose; // latest raw vision measurement used
     private int lastTargetCount;
 
-    private double prevLeftDistance = 0.0;
-    private double prevRightDistance = 0.0;
-
-    private double nextSimVisionTime = 0.0;
     private double lastSimVisionTimestamp = -1.0;
 
     private final DriveSystem drive;
@@ -54,34 +47,8 @@ public class VisionSubsystem extends SubsystemBase {
     /** Constructor: configure sensors, estimator, and Limelight */
     public VisionSubsystem(DriveSystem drive) {
         // Initialize kinematics and sensors
-        kinematics = new DifferentialDriveKinematics(Constants.DriveConstants.trackWidthMeters);
         gyro = DriveSystem.imu;
         this.drive = drive;
-        this.leftEncoder = drive.leftEncoder;
-        this.rightEncoder = drive.rightEncoder;
-
-        // Initialize previous encoder distances
-        prevLeftDistance = leftEncoder.getDistance();
-        prevRightDistance = rightEncoder.getDistance();
-
-        // Configure pose estimator with noise from constants
-        poseEstimator = new DifferentialDrivePoseEstimator(
-            kinematics,
-            gyro.getRotation2d(),
-            leftEncoder.getDistance(),
-            rightEncoder.getDistance(),
-            new Pose2d(),
-            VecBuilder.fill(
-                Constants.Vision.stateStdDevPosMeters,
-                Constants.Vision.stateStdDevPosMeters,
-                Units.degreesToRadians(Constants.Vision.stateStdDevThetaDeg)
-            ),
-            VecBuilder.fill(
-                Constants.Vision.visionStdDevPosMeters,
-                Constants.Vision.visionStdDevPosMeters,
-                Units.degreesToRadians(Constants.Vision.visionStdDevThetaDeg)
-            )
-        );
 
         // general setup
         currentCamMode = CameraMode.VISION;
@@ -115,88 +82,111 @@ public class VisionSubsystem extends SubsystemBase {
      * Should be called periodically.
     */
     public void updatePose() {
-        // --- ODOMETRY UPDATE ---
-        double leftDist = leftEncoder.getDistance();
-        double rightDist = rightEncoder.getDistance();
-        poseEstimator.update(
-            gyro.getRotation2d(),
-            leftDist,
-            rightDist
-        );
-        prevLeftDistance = leftDist;
-        prevRightDistance = rightDist;
-
         // --- VISION UPDATE ---
         switchPipeline(Pipeline.APRIL_TAGS);
         switchCameraMode(CameraMode.VISION);
+
+        boolean hasGoodVision = false;
 
         if (edu.wpi.first.wpilibj.RobotBase.isSimulation()) {
             double[] botpose = limelightTable.getEntry("botpose_wpiblue").getDoubleArray(new double[0]);
             SmartDashboard.putNumberArray("LL Raw BotPose", botpose);
             double tv = limelightTable.getEntry("tv").getDouble(0.0);
+            int tc = (int) limelightTable.getEntry("tc").getDouble(0.0);
+            lastTargetCount = tc;
 
-            if (tv >= 1.0 && botpose.length >= 7) {
+            if (tv >= 1.0 && botpose.length >= 7 && tc >= Constants.Vision.minTagsForVision) {
                 Pose2d simPose = new Pose2d(
-                    botpose[0], // x (m)
-                    botpose[1], // y (m)
-                    Rotation2d.fromDegrees(botpose[5]) // yaw (deg)
+                    botpose[0],
+                    botpose[1],
+                    Rotation2d.fromDegrees(botpose[5])
                 );
                 double latencySec = botpose[6] / 1000.0;
                 double ts = Timer.getFPGATimestamp() - latencySec;
 
-                if (ts > lastSimVisionTimestamp) {
-                    poseEstimator.addVisionMeasurement(
-                        simPose,
-                        ts,
-                        VecBuilder.fill(
-                            Constants.Vision.simVisionStdDevPosMeters,
-                            Constants.Vision.simVisionStdDevPosMeters,
-                            Units.degreesToRadians(Constants.Vision.simVisionStdDevThetaDeg)
-                        )
-                    );
+                if (ts > lastSimVisionTimestamp && isPoseCloseToOdom(simPose)) {
+                    drive.addVisionMeasurement(simPose, ts);
+                    lastVisionPose = simPose;
                     lastSimVisionTimestamp = ts;
+                    hasGoodVision = true;
+                } else {
+                    lastVisionPose = null;
                 }
+            } else {
+                lastVisionPose = null;
             }
         } else {
-            double currentRotation = poseEstimator.getEstimatedPosition().getRotation().getDegrees();
-            LimelightHelpers.SetRobotOrientation("limelight", currentRotation, 0, 0, 0, 0, 0);
-            LimelightHelpers.PoseEstimate visionResult = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(Constants.Vision.LIMELIGHT_TABLE_NAME);
+            double gyroYawDeg = gyro.getRotation2d().getDegrees();
+            LimelightHelpers.SetRobotOrientation(
+                Constants.Vision.LIMELIGHT_TABLE_NAME, gyroYawDeg, 0, 0, 0, 0, 0
+            );
+
+            LimelightHelpers.PoseEstimate visionResult =
+                LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(Constants.Vision.LIMELIGHT_TABLE_NAME);
 
             double[] botpose = limelightTable.getEntry("botpose_wpiblue").getDoubleArray(new double[0]);
             SmartDashboard.putNumberArray("LL Raw BotPose", botpose);
 
             if (visionResult != null) {
-                // Debug: Output vision pose and timestamp
-                SmartDashboard.putNumber("LL Vision X", visionResult.pose.getX());
-                SmartDashboard.putNumber("LL Vision Y", visionResult.pose.getY());
-                SmartDashboard.putNumber("LL Vision Rot", visionResult.pose.getRotation().getDegrees());
-                SmartDashboard.putNumber("LL Vision Timestamp", visionResult.timestampSeconds);
                 SmartDashboard.putNumber("LL Vision TagCount", visionResult.tagCount);
 
-                // Only use vision if pose is not zero and at least one tag is detected
                 boolean validVision = hasValidAprilTarget()
                     && Math.abs(gyro.getRate()) < Constants.Vision.maxGyroRate
                     && visionResult.tagCount > 0
                     && !(visionResult.pose.getX() == 0 && visionResult.pose.getY() == 0);
 
-                if (validVision) {
-                    double measStd = visionResult.avgTagDist / Constants.Vision.idealDetectionRange;
-                    poseEstimator.addVisionMeasurement(
-                        visionResult.pose,
-                        visionResult.timestampSeconds,
-                        VecBuilder.fill(measStd, measStd, Double.MAX_VALUE)
-                    );
-                    onNewVisionPose(visionResult.pose);
+                if (validVision && visionResult.tagCount >= Constants.Vision.minTagsForVision
+                    && isPoseCloseToOdom(visionResult.pose)) {
+                    drive.addVisionMeasurement(visionResult.pose, visionResult.timestampSeconds);
+                    lastVisionPose = visionResult.pose;
+                    hasGoodVision = true;
+                } else {
+                    lastVisionPose = null;
                 }
             } else {
-                // Only show "No vision result" if not in simulation
-                if (!edu.wpi.first.wpilibj.RobotBase.isSimulation()) {
-                    SmartDashboard.putString("LL Vision Status", "No vision result");
-                }
+                lastVisionPose = null;
             }
         }
 
-        lastEstimatedPose = poseEstimator.getEstimatedPosition();
+        lastEstimatedPose = drive.getPose();
+
+        if (hasGoodVision && lastVisionPose != null) {
+            double[] visionPose2d = {
+                lastVisionPose.getX(),
+                lastVisionPose.getY(),
+                lastVisionPose.getRotation().getDegrees()
+            };
+            NetworkTableInstance.getDefault()
+                .getTable("/AdvantageScope/Vision")
+                .getEntry("VisionPose")
+                .setDoubleArray(visionPose2d);
+        } else {
+            NetworkTableInstance.getDefault()
+                .getTable("/AdvantageScope/Vision")
+                .getEntry("VisionPose")
+                .setDoubleArray(new double[0]);
+        }
+
+        double alpha = hasGoodVision ? 0.75 : 0.25;
+        Pose2d blended = new Pose2d(
+            lastEstimatedPose.getTranslation().interpolate(
+                (lastVisionPose != null ? lastVisionPose.getTranslation() : lastEstimatedPose.getTranslation()),
+                alpha
+            ),
+            lastEstimatedPose.getRotation().interpolate(
+                (lastVisionPose != null ? lastVisionPose.getRotation() : lastEstimatedPose.getRotation()),
+                alpha
+            )
+        );
+        double[] blended2d = {
+            blended.getX(),
+            blended.getY(),
+            blended.getRotation().getDegrees()
+        };
+        NetworkTableInstance.getDefault()
+            .getTable("/AdvantageScope/Vision")
+            .getEntry("InterpolatedPose")
+            .setDoubleArray(blended2d);
 
         restoreCameraSettings();
     }
@@ -255,86 +245,68 @@ public class VisionSubsystem extends SubsystemBase {
         return lastTargetCount;
     }
 
+    /**
+     * Gets the "best" coral detection (largest area) from Limelight AI detector.
+     * Temporarily switches to OBJECT_DETECTION pipeline, reads detections, then restores settings.
+     * @return RawDetection or null if none found
+     */
+    public LimelightHelpers.RawDetection getBestCoralDetection() {
+        // Remember current settings
+        var savedMode = currentCamMode;
+        var savedPipe = currentPipeline;
+
+        try {
+            // Force OD pipeline to fetch detections
+            switchPipeline(Pipeline.OBJECT_DETECTION);
+            switchCameraMode(CameraMode.VISION);
+
+            LimelightHelpers.RawDetection[] dets =
+                LimelightHelpers.getRawDetections(Constants.Vision.LIMELIGHT_TABLE_NAME);
+            if (dets == null || dets.length == 0) return null;
+
+            // Filter to coral class and pick max area
+            return Arrays.stream(dets)
+                .filter(d -> d.classId == Constants.Vision.coralClassId)
+                .max(Comparator.comparingDouble(d -> d.ta))
+                .orElse(null);
+        } finally {
+            // Restore user-selected vision settings
+            currentCamMode = savedMode;
+            currentPipeline = savedPipe;
+            restoreCameraSettings();
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Private Helpers
     // -----------------------------------------------------------------------
+    
     private void restoreCameraSettings() {
         switchPipeline(currentPipeline);
         switchCameraMode(currentCamMode);
     }
 
-    private void onNewVisionPose(Pose2d estimatedPose) {
-        double ts = Timer.getFPGATimestamp();
-        drive.addVisionMeasurement(estimatedPose, ts);
+    // Decide if the vision pose is close enough to odometry/gyro to trust
+    private boolean isPoseCloseToOdom(Pose2d visionPose) {
+        Pose2d odomPose = drive.getPose();
+        double transErr = odomPose.getTranslation().getDistance(visionPose.getTranslation());
+        double yawErrDeg = Math.abs(visionPose.getRotation().minus(odomPose.getRotation()).getDegrees());
+        if (yawErrDeg > 180.0) yawErrDeg = 360.0 - yawErrDeg;
+
+        SmartDashboard.putNumber("Vision/OdomTransErr", transErr);
+        SmartDashboard.putNumber("Vision/OdomYawErrDeg", yawErrDeg);
+
+        return transErr <= Constants.Vision.visionMaxTranslationErrorMeters
+            && yawErrDeg <= Constants.Vision.visionMaxYawErrorDeg;
     }
 
     @Override
     public void periodic() {
-        // Always update pose estimator with odometry and vision
         updatePose();
-
-        // Publish pose for AdvantageScope and SmartDashboard
-        double[] poseArr = {
-            lastEstimatedPose.getX(),
-            lastEstimatedPose.getY(),
-            lastEstimatedPose.getRotation().getDegrees()
-        };
-        NetworkTableInstance.getDefault()
-            .getTable("/AdvantageScope/Vision")
-            .getEntry("EstimatedPose")
-            .setDoubleArray(poseArr);
-        SmartDashboard.putNumberArray("EstimatedPose", poseArr);
-
-        // Optionally publish an "ideal" pose as a ghost
-        double[] idealArr = {
-            Constants.Vision.idealDetectionRange, 0, 0
-        };
-        NetworkTableInstance.getDefault()
-            .getTable("/AdvantageScope/Vision")
-            .getEntry("IdealPose")
-            .setDoubleArray(idealArr);
-        SmartDashboard.putNumberArray("IdealPose", idealArr);
     }
 
     @Override
     public void simulationPeriodic() {
-        // Simulate odometry update
-        double leftDist = leftEncoder.getDistance();
-        double rightDist = rightEncoder.getDistance();
-        poseEstimator.update(
-            gyro.getRotation2d(),
-            leftDist,
-            rightDist
-        );
-        prevLeftDistance = leftDist;
-        prevRightDistance = rightDist;
-
-        // Publish a simulated Limelight pose to NT at configured rate
-        double now = Timer.getFPGATimestamp();
-        if (now >= nextSimVisionTime) {
-            Pose2d simVisionPose = poseEstimator.getEstimatedPosition();
-            pushSimLimelightPose(simVisionPose, Constants.Vision.simLatencyMs);
-            nextSimVisionTime = now + Constants.Vision.simUpdatePeriodSec;
-        }
-
-        lastEstimatedPose = poseEstimator.getEstimatedPosition();
-    }
-
-    private void pushSimLimelightPose(Pose2d pose, double latencyMs) {
-        // Populate NT entries to emulate Limelight outputs
-        double[] arr = new double[] {
-            pose.getX(),                       // X (m)
-            pose.getY(),                       // Y (m)
-            0.0,                               // Z (m)
-            0.0,                               // roll (deg)
-            0.0,                               // pitch (deg)
-            pose.getRotation().getDegrees(),   // yaw (deg)
-            latencyMs                          // latency (ms)
-        };
-        limelightTable.getEntry("tv").setDouble(1.0);
-        limelightTable.getEntry("botpose_wpiblue").setDoubleArray(arr);
-        limelightTable.getEntry("pipeline").setNumber(Pipeline.APRIL_TAGS.value);
-        limelightTable.getEntry("camMode").setNumber(CameraMode.VISION.value);
-        SmartDashboard.putString("LL Vision Status", "Simulated vision injected");
+        updatePose();
     }
 }

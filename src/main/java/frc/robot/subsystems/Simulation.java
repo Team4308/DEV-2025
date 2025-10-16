@@ -2,7 +2,6 @@ package frc.robot.subsystems;
 
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.wpilibj.RobotController;
-import edu.wpi.first.wpilibj.simulation.ADXRS450_GyroSim;
 import edu.wpi.first.wpilibj.simulation.DifferentialDrivetrainSim;
 import edu.wpi.first.wpilibj.simulation.EncoderSim;
 import edu.wpi.first.wpilibj.simulation.SingleJointedArmSim;
@@ -14,15 +13,16 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.wpilibj.ADXRS450_Gyro;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.RobotBase;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
+import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Rotation3d;
@@ -39,23 +39,23 @@ import org.photonvision.simulation.PhotonCameraSim;
 import org.photonvision.simulation.SimCameraProperties;
 import org.photonvision.simulation.VisionSystemSim;
 
+import frc.robot.Constants;
+
 public class Simulation extends SubsystemBase {
     private final WPI_TalonSRX leftLeader;
     private final WPI_TalonSRX rightLeader;
-    private final ADXRS450_Gyro gyro;
     private final Encoder leftEncoder;
     private final Encoder rightEncoder;
     private DifferentialDrivetrainSim drivetrainSimulator;
     private EncoderSim leftEncoderSim;
     private EncoderSim rightEncoderSim;
-    private ADXRS450_GyroSim gyroSim;
     private Field2d fieldSim;
     private final DifferentialDriveKinematics kinematics;
     private final Pose2d initialPose = new Pose2d(8, 3, new Rotation2d());
+    private DifferentialDriveOdometry simOdometry;
+    private NetworkTableEntry encoderOdomPoseEntry;
 
     // Arm Setup
-
-//    private final ArmSubsystem m_ArmSubsystem = new ArmSubsystem();
     private LoggedMechanism2d mech;
     private Pose3d Arm = new Pose3d();
     private SingleJointedArmSim m_ArmSim;
@@ -64,11 +64,21 @@ public class Simulation extends SubsystemBase {
     public static boolean AtAngleSimulation;
     public static double AngleSimulation;
 
+    // Sim-driven inputs for arm
+    private double armInputVoltage = 0.0;
+    private double armTargetAngleDeg = 0.0;
 
     private NetworkTableEntry typeEntry;
     private NetworkTableEntry chassisSpeedsEntry;
     private NetworkTableEntry poseEntry;
     private NetworkTableEntry simVisionPoseEntry;
+    // New 2D pose publishers
+    private NetworkTableEntry visionPose2dEntry;
+    private NetworkTableEntry interpPose2dEntry;
+    // New: Arm telemetry
+    private NetworkTableEntry armAngleDegEntry;
+    private NetworkTableEntry armTargetDegEntry;
+    private NetworkTableEntry armVoltageEntry;
 
     // PhotonVision sim fields
     private PhotonCamera photonCamera;
@@ -91,61 +101,57 @@ public class Simulation extends SubsystemBase {
     private VisionEstimate latestVisionEstimate;    
     // Use encoders from DriveSystem (remove internal construction)
 
+    // Simple internal heading for sim (degrees, CCW+)
+    private double headingDeg = 0.0;
 
-
-
-      private void ArmInit() {
+    private void ArmInit() {
         m_ArmSim = new SingleJointedArmSim(
-                DCMotor.getNEO(1),
-                18.333,
-                SingleJointedArmSim.estimateMOI(Units.inchesToMeters(10), Units.lbsToKilograms(3)),
-                Units.inchesToMeters(10),
-                Units.degreesToRadians(-10000000000000000000.00),
-                Units.degreesToRadians(10000000000000.00),
-                true,
-                Units.degreesToRadians(270),
-                0.0,
-                0.0);
+            DCMotor.getNEO(Constants.Simulation.arm.motorCount),
+            Constants.Simulation.arm.gearRatio,
+            SingleJointedArmSim.estimateMOI(Constants.Simulation.arm.armLengthMeters, Constants.Simulation.arm.armMassKg),
+            Constants.Simulation.arm.armLengthMeters,
+            Units.degreesToRadians(Constants.Simulation.arm.minAngleDeg),
+            Units.degreesToRadians(Constants.Simulation.arm.maxAngleDeg),
+            Constants.Simulation.arm.simulateGravity,
+            Units.degreesToRadians(Constants.Simulation.arm.armOffsetDeg),
+            0.0,
+            0.0
+        );
 
-        m_ArmRoot = mech.getRoot(" Arm Root", 5, 0);
-        m_ArmMech2d = m_ArmRoot
-                .append(new LoggedMechanismLigament2d(" Arm", Units.radiansToDegrees(m_ArmSim.getAngleRads()),
-                        270));
+        m_ArmRoot = mech.getRoot("Arm Root", 5, 0);
+        m_ArmMech2d = m_ArmRoot.append(
+            new LoggedMechanismLigament2d("Arm", Constants.Simulation.arm.armLengthMeters, 0)
+        );
     }
 
     private void Arm() {
-       // double targetAngle = m_ArmSubsystem.getTargetAngle();
-        double targetAngle = 0;
-       // m_ArmSim.setInputVoltage(-m_ArmSubsystem.getVoltage());
+        // Apply commanded voltage (0 if "braked" by caller setting voltage to 0)
+        m_ArmSim.setInputVoltage(armInputVoltage);
 
-        m_ArmSim.update(0.020);
+        // Sim step
+        m_ArmSim.update(Constants.Simulation.arm.simLoopPeriodSec);
 
-        AngleSimulation = Units.radiansToDegrees(m_ArmSim.getAngleRads());
-        if (AngleSimulation < 0) {
-            AngleSimulation = 360000000 - AngleSimulation;
+        // Raw sim angle (deg)
+        double rawDeg = Units.radiansToDegrees(m_ArmSim.getAngleRads());
+        // Normalize for display: [-180,180], then make non-negative for dashboard
+        double wrapped = ((rawDeg % 360.0) + 360.0) % 360.0;
+        if (wrapped > 180.0) wrapped -= 360.0;
+        AngleSimulation = Math.abs(wrapped);
+
+        // Telemetry and convenience flags
+        AtAngleSimulation = Math.abs(AngleSimulation - armTargetAngleDeg) <= Constants.Simulation.arm.atAngleToleranceDeg;
+
+        // Mech2d visualization
+        if (m_ArmMech2d != null) {
+            m_ArmMech2d.setAngle(AngleSimulation);
+            m_ArmMech2d.setLength(Constants.Simulation.arm.armLengthMeters);
         }
-        AngleSimulation %= 360;
-        AngleSimulation = 360 - AngleSimulation;
 
-        if (Math.abs(AngleSimulation - targetAngle) < 30
-                || Math.abs(360 - AngleSimulation - targetAngle) < 30) {
-            AtAngleSimulation = true;
-        } else {
-            AtAngleSimulation = false;
-        }
-        AtAngleSimulation = true;
-
-        m_ArmSim.setState(
-                Units.degreesToRadians((Units.radiansToDegrees(m_ArmSim.getAngleRads()) + 36000) % 360), 0);
-
-        Arm = new Pose3d(
-                new Translation3d(0.0, -0.2, 0.0),
-                new Rotation3d(0, Units.degreesToRadians(90) - Units.degreesToRadians(targetAngle), 0));
-        m_ArmMech2d.setAngle(Units.radiansToDegrees(m_ArmSim.getAngleRads()));
-
+        // Publish telemetry
+        if (armAngleDegEntry != null) armAngleDegEntry.setDouble(AngleSimulation);
+        if (armTargetDegEntry != null) armTargetDegEntry.setDouble(armTargetAngleDeg);
+        if (armVoltageEntry != null) armVoltageEntry.setDouble(armInputVoltage);
     }
-
-    
 
     public Simulation(WPI_TalonSRX leftLeader, WPI_TalonSRX rightLeader, Encoder leftEncoder, Encoder rightEncoder) {
         
@@ -154,14 +160,12 @@ public class Simulation extends SubsystemBase {
         this.leftEncoder = leftEncoder;
         this.rightEncoder = rightEncoder;
         mech = new LoggedMechanism2d(10, 10);
-        gyro = new ADXRS450_Gyro();
 
         // Set DPP for provided encoders in sim
         this.leftEncoder.setDistancePerPulse(0.0254);
         this.rightEncoder.setDistancePerPulse(0.0254);
 
         kinematics = new DifferentialDriveKinematics(0.65);
-        //ArmInit();
         if (RobotBase.isSimulation()) {
             drivetrainSimulator = new DifferentialDrivetrainSim(
                 DCMotor.getCIM(3),
@@ -174,7 +178,6 @@ public class Simulation extends SubsystemBase {
                 
             leftEncoderSim = new EncoderSim(this.leftEncoder);
             rightEncoderSim = new EncoderSim(this.rightEncoder);
-            gyroSim = new ADXRS450_GyroSim(gyro);
             
             fieldSim = new Field2d();
             SmartDashboard.putData("Field", fieldSim); // ensure Field2d appears
@@ -191,6 +194,18 @@ public class Simulation extends SubsystemBase {
 
             // Add AdvantageScope vision pose publisher
             simVisionPoseEntry = instance.getTable("/AdvantageScope/Vision").getEntry("SimVisionPose");
+            // New: 2D arrays for vision and blended poses
+            visionPose2dEntry = instance.getTable("/AdvantageScope/Vision").getEntry("VisionPose");
+            interpPose2dEntry = instance.getTable("/AdvantageScope/Vision").getEntry("InterpolatedPose");
+
+            // Arm telemetry entries
+            var armTable = instance.getTable("/AdvantageScope/Arm");
+            armAngleDegEntry = armTable.getEntry("AngleDeg");
+            armTargetDegEntry = armTable.getEntry("TargetAngleDeg");
+            armVoltageEntry = armTable.getEntry("Voltage");
+
+            // Initialize Arm sim
+            ArmInit();
 
             // Vision sim setup
             try {
@@ -230,13 +245,21 @@ public class Simulation extends SubsystemBase {
             visionSim = new VisionSystemSim("SimPV");
             visionSim.addAprilTags(tagLayout);
             visionSim.addCamera(photonCameraSim, robotToCam3d);
+
+            encoderOdomPoseEntry = instance.getTable("/AdvantageScope/Drive").getEntry("EncoderOdomPose");
+            // Initialize sim odometry from current heading and starting distances
+            simOdometry = new DifferentialDriveOdometry(
+                Rotation2d.fromDegrees(headingDeg), 0.0, 0.0, initialPose
+            );
         }
     }
     
     @Override
     public void simulationPeriodic() {
         if (!RobotBase.isSimulation()) return;
-        //Arm();
+        // Arm sim tick
+        Arm();
+
         double leftVoltage = leftLeader.get() * RobotController.getBatteryVoltage();
         double rightVoltage = rightLeader.get() * RobotController.getBatteryVoltage();
         leftVoltage = Math.abs(leftVoltage) < 0.1 ? 0 : leftVoltage;
@@ -249,29 +272,108 @@ public class Simulation extends SubsystemBase {
         leftEncoderSim.setRate(drivetrainSimulator.getLeftVelocityMetersPerSecond());
         rightEncoderSim.setDistance(drivetrainSimulator.getRightPositionMeters());
         rightEncoderSim.setRate(drivetrainSimulator.getRightVelocityMetersPerSecond());
-        gyroSim.setAngle(-drivetrainSimulator.getHeading().getDegrees());
+        setSimHeadingDegrees(-drivetrainSimulator.getHeading().getDegrees());
         
         fieldSim.setRobotPose(drivetrainSimulator.getPose());
         
         updateAdvantageScope();
 
+        // Update encoder+gyro odometry and publish
+        var odomPose = simOdometry.update(
+            Rotation2d.fromDegrees(headingDeg),
+            drivetrainSimulator.getLeftPositionMeters(),
+            drivetrainSimulator.getRightPositionMeters()
+        );
+        if (encoderOdomPoseEntry != null) {
+            encoderOdomPoseEntry.setDoubleArray(new double[] {
+                odomPose.getX(), odomPose.getY(), odomPose.getRotation().getDegrees()
+            });
+        }
+
             Pose2d poseForVision = drivetrainSimulator.getPose();
             visionSim.update(poseForVision);
 
             var result = photonCamera.getLatestResult();
-            if (result != null && result.hasTargets()) {
-            var estOpt = photonEstimator.update(result);
-            if (estOpt.isPresent()) {
-                var est = estOpt.get();
-                latestVisionEstimate = new VisionEstimate(est.estimatedPose.toPose2d(), est.timestampSeconds);
+            NetworkTable limelight = NetworkTableInstance.getDefault().getTable(frc.robot.Constants.Vision.LIMELIGHT_TABLE_NAME);
+            if (result != null) {
+                int tagCount = result.hasTargets() ? result.getTargets().size() : 0;
 
-                double[] visionPoseArray = {
-                    latestVisionEstimate.pose.getX(),
-                    latestVisionEstimate.pose.getY(),
-                    latestVisionEstimate.pose.getRotation().getDegrees()
-                };
-                simVisionPoseEntry.setDoubleArray(visionPoseArray);
-            }
+                if (result.hasTargets()) {
+                    var estOpt = photonEstimator.update(result);
+                    if (estOpt.isPresent()) {
+                        var est = estOpt.get();
+                        latestVisionEstimate = new VisionEstimate(est.estimatedPose.toPose2d(), est.timestampSeconds);
+
+                        tagCount = result.getTargets().size();
+                        
+                        double[] visionPose2d = {
+                            latestVisionEstimate.pose.getX(),
+                            latestVisionEstimate.pose.getY(),
+                            latestVisionEstimate.pose.getRotation().getDegrees()
+                        };
+                        simVisionPoseEntry.setDoubleArray(visionPose2d);
+                        visionPose2dEntry.setDoubleArray(visionPose2d);
+
+                        Pose2d odomPoseForVision = drivetrainSimulator.getPose();
+                        Pose2d interp = new Pose2d(
+                            odomPoseForVision.getTranslation().interpolate(latestVisionEstimate.pose.getTranslation(), 0.5),
+                            odomPoseForVision.getRotation().interpolate(latestVisionEstimate.pose.getRotation(), 0.5)
+                        );
+                        double[] interpPose2d = {
+                            interp.getX(),
+                            interp.getY(),
+                            interp.getRotation().getDegrees()
+                        };
+                        interpPose2dEntry.setDoubleArray(interpPose2d);
+
+                        double latencyMs = frc.robot.Constants.Vision.simLatencyMs;
+                        double[] botpose = new double[] {
+                            latestVisionEstimate.pose.getX(),
+                            latestVisionEstimate.pose.getY(),
+                            0.0,
+                            0.0,
+                            0.0,
+                            latestVisionEstimate.pose.getRotation().getDegrees(),
+                            latencyMs
+                        };
+                        limelight.getEntry("tv").setDouble(1.0);
+                        limelight.getEntry("botpose_wpiblue").setDoubleArray(botpose);
+                        limelight.getEntry("pipeline").setNumber(0);
+                        limelight.getEntry("camMode").setNumber(0);
+                        limelight.getEntry("tc").setNumber(tagCount);
+                        NetworkTableInstance.getDefault()
+                            .getTable("/AdvantageScope/Vision")
+                            .getEntry("TagCount")
+                            .setDouble(tagCount);
+                    } else {
+                        // Targets but no pose estimate: no valid target for LL consumers
+                        limelight.getEntry("tv").setDouble(0.0);
+                        limelight.getEntry("botpose_wpiblue").setDoubleArray(new double[0]);
+                        limelight.getEntry("tc").setNumber(tagCount);
+                        NetworkTableInstance.getDefault()
+                            .getTable("/AdvantageScope/Vision")
+                            .getEntry("TagCount")
+                            .setDouble(tagCount);
+                    }
+                } else {
+                    // No targets: clear LL outputs
+                    limelight.getEntry("tv").setDouble(0.0);
+                    limelight.getEntry("botpose_wpiblue").setDoubleArray(new double[0]);
+                    limelight.getEntry("tc").setNumber(0);
+                    NetworkTableInstance.getDefault()
+                        .getTable("/AdvantageScope/Vision")
+                        .getEntry("TagCount")
+                        .setDouble(0);
+                }
+            } else {
+                // No result at all: clear LL outputs
+                limelight.getEntry("tv").setDouble(0.0);
+                limelight.getEntry("botpose_wpiblue").setDoubleArray(new double[0]);
+                limelight.getEntry("tc").setNumber(0);
+                NetworkTableInstance.getDefault()
+                    .getTable("/AdvantageScope/Vision")
+                    .getEntry("TagCount")
+                    .setDouble(0);
             }
 
     }
@@ -303,7 +405,7 @@ public class Simulation extends SubsystemBase {
         if (RobotBase.isSimulation()) {
             drivetrainSimulator.setPose(pose);
             fieldSim.setRobotPose(pose);
-            gyro.reset();
+            resetHeading();
         }
     }
     
@@ -319,7 +421,7 @@ public class Simulation extends SubsystemBase {
     }
     
     public double getHeading() {
-        return normalizeAngle(-gyro.getAngle());
+        return headingDeg;
     }
     
     public double getLeftDistanceMeters() {
@@ -330,22 +432,30 @@ public class Simulation extends SubsystemBase {
         return drivetrainSimulator.getRightPositionMeters();
     }
     
-    private double normalizeAngle(double angle) {
-        angle = angle % 360.0;
-        if (angle < 0) angle += 360.0;
-        if (angle >= 180.0) angle -= 360.0;
-        return angle;
-    }
+
     
     public DifferentialDrivetrainSim getDrivetrainSim() {
         return drivetrainSimulator;
     }
-    
-    public ADXRS450_Gyro getGyro() {
-        return gyro;
-    }
 
     public VisionEstimate getLatestVisionEstimate() {
         return latestVisionEstimate;
+    }
+
+    private void setSimHeadingDegrees(double heading) {
+        this.headingDeg = heading;
+    }
+
+    public void resetHeading() {
+        headingDeg = 0.0;
+    }
+    public void setArmVoltage(double volts) {
+        armInputVoltage = volts;
+    }
+    public void setArmTargetAngleDeg(double targetDeg) {
+        armTargetAngleDeg = targetDeg;
+    }
+    public double getArmAngleDeg() {
+        return AngleSimulation;
     }
 }

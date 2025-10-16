@@ -7,6 +7,7 @@ package frc.robot;
 
 import frc.robot.commands.score;
 import frc.robot.commands.Sequential.CoralIntakeCommand;
+import frc.robot.commands.Sequential.DriveToCoralCommand;
 import frc.robot.subsystems.ArmSubsystem;
 import frc.robot.subsystems.DriveSystem;
 
@@ -25,11 +26,33 @@ import frc.robot.subsystems.Vision.VisionSubsystem;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 
 public class RobotContainer {
+  // Enums are cool
+
+
+  /**
+   * The different states the robot can be in.
+   * INTAKING - The robot is intaking a coral.
+   * SCORING - The robot is scoring a coral.
+   * AUTO - The robot is in autonomous mode.
+   * IDLE - The robot is not doing anything.
+   * DISABLED - The robot is disabled.
+   * SEEKING - The robot is seeking a coral.
+   */
+  public enum BotState {
+    INTAKING,
+    SCORING,
+    AUTO,
+    SEEKING,
+    IDLE,
+    DISABLED
+  }
+  public static BotState currentState = BotState.IDLE;
+
   public static boolean groundIntake = false; 
-  private final EndEffectorSubsystem m_intakeSubsystem = new EndEffectorSubsystem();
-  private final DriveSystem m_driveSystem = new DriveSystem();
-  private final ArmSubsystem m_armSubsystem = new ArmSubsystem();
-  private final VisionSubsystem m_Vision = new VisionSubsystem(m_driveSystem);
+  public final EndEffectorSubsystem m_intakeSubsystem = new EndEffectorSubsystem();
+  public final DriveSystem m_driveSystem = new DriveSystem();
+  public final static ArmSubsystem m_armSubsystem = new ArmSubsystem();
+  public final VisionSubsystem m_Vision = new VisionSubsystem(m_driveSystem);
   @SuppressWarnings("static-access")
   private final DifferentialDrive m_robotDrive = new DifferentialDrive(m_driveSystem.leaderLeft, m_driveSystem.leaderRight);
 
@@ -61,6 +84,18 @@ public class RobotContainer {
     driver.RB.onTrue(new InstantCommand(() -> m_driveSystem.driveToPose(m_driveSystem.nearestPoseToRightReef)));
     driver.LB.onTrue(new InstantCommand(() -> m_driveSystem.driveToPose(m_driveSystem.nearestPoseToLeftReef)));
 
+    driver.A.onTrue(new InstantCommand(() -> {
+      if (currentState == BotState.INTAKING) {
+        currentState = BotState.SCORING;
+      } else {
+        currentState = BotState.INTAKING;
+      }
+    }));
+
+    driver.Y.onTrue(new InstantCommand(() -> groundIntake = !groundIntake));
+
+    // Hold X to seek and drive to coral for intake
+    driver.X.whileTrue(new DriveToCoralCommand(m_driveSystem, m_Vision, m_intakeSubsystem));
 
     m_driveSystem.setDefaultCommand(
       new RunCommand(
@@ -83,16 +118,15 @@ public class RobotContainer {
 
   private void OperatorBinds() {
 
-   // If we dont have a coral try to intake it. If we do have a coral score it.
+   // 1 Driver bot 
 
-   // This could also just all be in driver. Change ltr
-   operator.B.onTrue(new InstantCommand(() -> { groundIntake = !groundIntake;  }));
+  //  operator.B.onTrue(new InstantCommand(() -> { groundIntake = !groundIntake;  }));
 
-   if (!m_intakeSubsystem.intakeSensor.get()) { 
-    operator.A.onTrue(new CoralIntakeCommand(m_intakeSubsystem, m_armSubsystem, groundIntake));
-   } else {
-    operator.A.onTrue(new score(m_intakeSubsystem, m_armSubsystem));
-   }
+  //  if (!m_intakeSubsystem.intakeSensor.get()) { 
+  //   operator.A.onTrue(new CoralIntakeCommand(m_intakeSubsystem, m_armSubsystem, groundIntake));
+  //  } else {
+  //   operator.A.onTrue(new score(m_intakeSubsystem, m_armSubsystem));
+  //  }
 
   }
 
