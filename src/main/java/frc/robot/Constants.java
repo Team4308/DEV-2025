@@ -8,23 +8,22 @@ public final class Constants {
     public static class Mapping {
         public static class Drive {
             // Motor ID's
-            public static int Left_Middle = 0;
-            public static int Right_Middle = 2;
-            public static int Left_Front = 2;
-            public static int Left_Back = 3;
-            public static int Right_Front = 4;
-            public static int Right_Back= 5;
 
+            // TODO: CHANGE IDS AGAIN 
+            public static int Left_Front = 1;
+            public static int Left_Back = 2;
+
+            public static int Right_Front = 3;
+            public static int Right_Back= 4;
 
             // Invert motor
+
+            // NOTE: Front is leader everyrthing else is follower
             public static boolean Left_Front_Inverted = false;
             public static boolean Right_Front_Inverted = true;
         
             public static boolean Left_Back_Inverted = true;
-            public static boolean Right_Back_Inverted = true;
-
-            public static boolean Left_Middle_Inverted = false;
-            public static boolean Right_Middle_Inverted = true;
+            public static boolean Right_Back_Inverted = false;
 
 
 
@@ -78,11 +77,10 @@ public final class Constants {
         public static final double SCORING_ANGLE = 35.0;
         public static final double RESTING_ANGLE = 15.0;
         public static final double FEEDER_ANGLE = 90.0;
-        public static final double GROUND_ANGLE = 0.0;
-        // PID and FF
-        public static final double kP = 0.001; // TODO: Tune
-        public static final double kI = 0.00;
-        public static final double kD = 0.00;
+        public static final double  GROUND_ANGLE = 0.0;
+        public static final double kP = 0.01;
+        public static final double kI = 0.0;
+        public static final double kD = 0.0;
 
         public static final double kS = 0.0; // TODO: Use ReClac Again
         public static final double kG = 0.74;
@@ -126,11 +124,7 @@ public final class Constants {
         public static final double ltvUpdatePeriodSec = 0.02;
 
         // Tolerances
-        public static final int HeadingTolerance = 1; // degrees
-    }
-
-    public static final class Deepclimb {
-        public static final int MOTORID = 10; // TODO: Change
+        public static final int HeadingTolerance = 3; // degrees
     }
 
     public static final class Vision {
@@ -169,5 +163,8 @@ public final class Constants {
         public static final double seekStopArea = 0.30;       
         public static final double seekLostRotate = 0.25;     
         public static final double seekTimeoutSec = 4.0;      
+    }
+    public static final class Deepclimb{ 
+        public static final int MOTORID = 30;
     }
 }

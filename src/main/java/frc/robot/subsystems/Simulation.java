@@ -78,6 +78,7 @@ public class Simulation extends SubsystemBase {
     private NetworkTableEntry armVoltageEntry;
 
     // PhotonVision sim 
+    // PhotonVision sim 
     private PhotonCamera photonCamera;
     private PhotonPoseEstimator photonEstimator;
     private VisionSystemSim visionSim;
@@ -86,6 +87,7 @@ public class Simulation extends SubsystemBase {
     private AprilTagFieldLayout tagLayout;
     private SimCameraProperties simCamProps;
 
+    //  vision estimate
     //  vision estimate
     public static class VisionEstimate {
         public final Pose2d pose;
@@ -163,6 +165,7 @@ public class Simulation extends SubsystemBase {
             rightEncoderSim = new EncoderSim(this.rightEncoder);
             
             fieldSim = new Field2d();
+            SmartDashboard.putData("Field", fieldSim); 
             SmartDashboard.putData("Field", fieldSim); 
 
             

@@ -2,10 +2,8 @@ package frc.robot.subsystems.Vision;
 
 import com.studica.frc.AHRS;
 
-import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -14,7 +12,6 @@ import frc.robot.Constants;
 import frc.robot.subsystems.Vision.LimelightHelpers.RawDetection;
 import frc.robot.subsystems.DriveSystem;
 import edu.wpi.first.wpilibj.Timer;
-import static java.lang.Double.MAX_VALUE;
 import java.util.Arrays;
 import java.util.Comparator;
 

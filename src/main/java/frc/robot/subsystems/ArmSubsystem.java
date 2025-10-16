@@ -41,6 +41,8 @@ public class ArmSubsystem extends SubsystemBase {
     public ArmSubsystem() {
 
         // Spark Max Config
+
+        // Spark Max Config
         armMotor = new SparkMax(ArmConstants.ARM_MOTOR_ID, MotorType.kBrushless);
         SparkMaxConfig config = new SparkMaxConfig();
         config.idleMode(SparkBaseConfig.IdleMode.kBrake);
@@ -55,8 +57,6 @@ public class ArmSubsystem extends SubsystemBase {
         double initAngleDeg = RobotBase.isSimulation() ? initialRawDeg : (initialRawDeg - ArmConstants.ZERO_OFFSET_DEG);
         targetAngle = initAngleDeg;
         controller.reset(initAngleDeg);
-        controller.setGoal(targetAngle);
-        controller.setTolerance(0.5);
 
         if (RobotBase.isSimulation() && DriveSystem.getSimulation() != null) {
             DriveSystem.getSimulation().setArmTargetAngleDeg(targetAngle);
@@ -81,6 +81,7 @@ public class ArmSubsystem extends SubsystemBase {
     }
 
     private void updateTargetAngleDeg(double targetDeg) {
+        // Set Target
         targetAngle = targetDeg;
         controller.setGoal(targetAngle);
 
@@ -91,6 +92,8 @@ public class ArmSubsystem extends SubsystemBase {
 
     @Override
     public void periodic() {
+
+
 
 
         double rawAngleDeg = (RobotBase.isSimulation() && DriveSystem.getSimulation() != null)
