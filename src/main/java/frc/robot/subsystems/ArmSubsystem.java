@@ -21,6 +21,7 @@ public class ArmSubsystem extends SubsystemBase {
     private final ProfiledPIDController controller = new ProfiledPIDController(
         ArmConstants.kP, ArmConstants.kI, ArmConstants.kD,
         new TrapezoidProfile.Constraints(ArmConstants.MAX_VEL_DEG_PER_S, ArmConstants.MAX_ACC_DEG_PER_S2)
+
     );
     private final ArmFeedforward ff = new ArmFeedforward(ArmConstants.kS, ArmConstants.kG, ArmConstants.kV);
 
@@ -33,6 +34,7 @@ public class ArmSubsystem extends SubsystemBase {
         config.encoder.positionConversionFactor(ArmConstants.DEG_PER_ENCODER_UNIT);
         config.encoder.velocityConversionFactor(ArmConstants.DEG_PER_ENCODER_UNIT / 60.0); // Divid by 60 for RPM to RPS
         armMotor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+
 
         encoder = armMotor.getEncoder();
 
@@ -52,6 +54,7 @@ public class ArmSubsystem extends SubsystemBase {
     public int getTargetAngle()  { return (int) targetAngle; }
     public double getVoltage()   { return armMotor.getAppliedOutput(); }
 
+
     private void applyMotorOutput(double volts) {
         double clamped = Math.max(-12.0, Math.min(12.0, volts));
         armMotor.setVoltage(clamped);
@@ -69,7 +72,6 @@ public class ArmSubsystem extends SubsystemBase {
         double pidEffort = controller.calculate(currentAngleDeg);
         TrapezoidProfile.State sp = controller.getSetpoint();
         double ffVolts = ff.calculate(Math.toRadians(sp.position), Math.toRadians(sp.velocity));
-
         applyMotorOutput(pidEffort + ffVolts);
     }
 }
