@@ -20,7 +20,6 @@ public class ArmSubsystem extends SubsystemBase {
     private final SparkMax armMotor;
     private final RelativeEncoder encoder;
 
-    // Trapezoid-profiled PID
     private final ProfiledPIDController controller = new ProfiledPIDController(
         ArmConstants.kP,
         ArmConstants.kI,
@@ -40,16 +39,26 @@ public class ArmSubsystem extends SubsystemBase {
     private double targetAngle = ArmConstants.RESTING_ANGLE;
 
     public ArmSubsystem() {
+
+        // Spark Max Config
         armMotor = new SparkMax(ArmConstants.ARM_MOTOR_ID, MotorType.kBrushless);
         SparkMaxConfig config = new SparkMaxConfig();
         config.idleMode(SparkBaseConfig.IdleMode.kBrake);
+        config.encoder.positionConversionFactor(ArmConstants.DEG_PER_ENCODER_UNIT);
+        config.encoder.velocityConversionFactor(ArmConstants.DEG_PER_ENCODER_UNIT / 60.0);
         armMotor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
-
         encoder = armMotor.getEncoder();
-        encoder.setPosition(0.0);
-
+        // Starting Deg
+        double initialRawDeg = (RobotBase.isSimulation() && DriveSystem.getSimulation() != null)
+            ? DriveSystem.getSimulation().getArmAngleDeg()
+            : encoder.getPosition();
+        double initAngleDeg = RobotBase.isSimulation() ? initialRawDeg : (initialRawDeg - ArmConstants.ZERO_OFFSET_DEG);
+        targetAngle = initAngleDeg;
+        controller.reset(initAngleDeg);
         controller.setGoal(targetAngle);
-        controller.setTolerance(1.0); 
+        controller.setTolerance(1.0);
+
+        // Simulation update
         if (RobotBase.isSimulation() && DriveSystem.getSimulation() != null) {
             DriveSystem.getSimulation().setArmTargetAngleDeg(targetAngle);
         }
@@ -65,7 +74,6 @@ public class ArmSubsystem extends SubsystemBase {
     public double getVoltage() { return armMotor.getAppliedOutput(); }
 
     private void applyMotorOutput(double volts) {
-        // Clamp to battery range
         double clamped = Math.max(-12.0, Math.min(12.0, volts));
         armMotor.setVoltage(clamped);
         if (RobotBase.isSimulation() && DriveSystem.getSimulation() != null) {
@@ -74,8 +82,11 @@ public class ArmSubsystem extends SubsystemBase {
     }
 
     private void updateTargetAngleDeg(double targetDeg) {
+        // Set Target
         targetAngle = targetDeg;
         controller.setGoal(targetAngle);
+
+        // Simulation
         if (RobotBase.isSimulation() && DriveSystem.getSimulation() != null) {
             DriveSystem.getSimulation().setArmTargetAngleDeg(targetDeg);
         }
@@ -83,13 +94,14 @@ public class ArmSubsystem extends SubsystemBase {
 
     @Override
     public void periodic() {
+
+
         double rawAngleDeg = (RobotBase.isSimulation() && DriveSystem.getSimulation() != null)
             ? DriveSystem.getSimulation().getArmAngleDeg()
             : encoder.getPosition();
-        double currentAngleDeg = rawAngleDeg - ArmConstants.ZERO_OFFSET_DEG;
+        double currentAngleDeg = RobotBase.isSimulation() ? rawAngleDeg : (rawAngleDeg - ArmConstants.ZERO_OFFSET_DEG);
 
         double pidEffort = controller.calculate(currentAngleDeg);
-
         TrapezoidProfile.State sp = controller.getSetpoint();
         double spPosRad = Math.toRadians(sp.position);
         double spVelRadPerS = Math.toRadians(sp.velocity);
@@ -100,7 +112,6 @@ public class ArmSubsystem extends SubsystemBase {
 
     @Override
     public void simulationPeriodic() {
-        // Mirror simulated angle into encoder so dashboards show motion
         if (DriveSystem.getSimulation() != null) {
             double simAngleDeg = DriveSystem.getSimulation().getArmAngleDeg();
             encoder.setPosition(simAngleDeg);

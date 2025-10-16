@@ -35,7 +35,7 @@ public final class Constants {
             public static final double armMassKg = 5.216312;          // Around 11.5 pounds (CAD)
             public static final double minAngleDeg = 0.0;
             public static final double maxAngleDeg = 180.0;
-            public static final double armOffsetDeg = 270.0;      // matches existing offset usage
+            public static final double armOffsetDeg = 0;      
             public static final boolean simulateGravity = true;
             public static final double simLoopPeriodSec = 0.020;  // 20ms loop
             public static final double atAngleToleranceDeg = 3.0;
@@ -53,12 +53,13 @@ public final class Constants {
     }
 
     public static final class ArmConstants {
-        public static final int ARM_MOTOR_ID = 20;
 
+        public static final int ARM_MOTOR_ID = 20;
         public static final double SCORING_ANGLE = 35.0;
         public static final double RESTING_ANGLE = 15.0;
         public static final double FEEDER_ANGLE = 90.0;
-        public static final double  GROUND_ANGLE = 0.0;
+        public static final double GROUND_ANGLE = 0.0;
+        // PID and FF
         public static final double kP = 0.01;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
@@ -67,9 +68,10 @@ public final class Constants {
         public static final double kG = 0.5;
         public static final double kV = 0.0;
 
+        // Offset
         public static final double ZERO_OFFSET_DEG = 0.0;
-
-        public static final double DEG_PER_ENCODER_UNIT = 1.0;
+        public static final double GEAR_RATIO = 500.0;
+        public static final double DEG_PER_ENCODER_UNIT = 360.0 / GEAR_RATIO;
 
         // Profiling 
         public static final double MAX_VEL_DEG_PER_S = 120.0;
@@ -90,7 +92,7 @@ public final class Constants {
         public static final double peakOutputForward = 1.0;
         public static final double peakOutputReverse = -1.0;
 
-        // Max robot speeds (used for teleop scaling)
+        // Max robot speeds
         public static final double maxLinearSpeedMps = 3.0;
         public static final double maxAngularSpeedRadPerSec = Math.PI;
 
@@ -104,7 +106,7 @@ public final class Constants {
         public static final double ltvUpdatePeriodSec = 0.02;
 
         // Tolerances
-        public static final int HeadingTolerance = 3; // degrees
+        public static final int HeadingTolerance = 1; // degrees
     }
 
     public static final class Vision {
@@ -121,7 +123,7 @@ public final class Constants {
         public static final double visionMaxTranslationErrorMeters = 0.35; // tune
         public static final double visionMaxYawErrorDeg = 10.0;            // tune
 
-        // Estimator process/measurement noise (base)
+        // Estimator 
         public static final double stateStdDevPosMeters = 0.05;
         public static final double stateStdDevThetaDeg = 5.0;
         public static final double visionStdDevPosMeters = 0.5;

@@ -63,8 +63,6 @@ public class Simulation extends SubsystemBase {
     private LoggedMechanismLigament2d m_ArmMech2d;
     public static boolean AtAngleSimulation;
     public static double AngleSimulation;
-
-    // Sim-driven inputs for arm
     private double armInputVoltage = 0.0;
     private double armTargetAngleDeg = 0.0;
 
@@ -72,15 +70,13 @@ public class Simulation extends SubsystemBase {
     private NetworkTableEntry chassisSpeedsEntry;
     private NetworkTableEntry poseEntry;
     private NetworkTableEntry simVisionPoseEntry;
-    // New 2D pose publishers
     private NetworkTableEntry visionPose2dEntry;
     private NetworkTableEntry interpPose2dEntry;
-    // New: Arm telemetry
     private NetworkTableEntry armAngleDegEntry;
     private NetworkTableEntry armTargetDegEntry;
     private NetworkTableEntry armVoltageEntry;
 
-    // PhotonVision sim fields
+    // PhotonVision sim 
     private PhotonCamera photonCamera;
     private PhotonPoseEstimator photonEstimator;
     private VisionSystemSim visionSim;
@@ -89,7 +85,7 @@ public class Simulation extends SubsystemBase {
     private AprilTagFieldLayout tagLayout;
     private SimCameraProperties simCamProps;
 
-    // Latest simulated vision estimate
+    //  vision estimate
     public static class VisionEstimate {
         public final Pose2d pose;
         public final double timestampSeconds;
@@ -99,9 +95,6 @@ public class Simulation extends SubsystemBase {
         }
     }
     private VisionEstimate latestVisionEstimate;    
-    // Use encoders from DriveSystem (remove internal construction)
-
-    // Simple internal heading for sim (degrees, CCW+)
     private double headingDeg = 0.0;
 
     private void ArmInit() {
@@ -125,29 +118,21 @@ public class Simulation extends SubsystemBase {
     }
 
     private void Arm() {
-        // Apply commanded voltage (0 if "braked" by caller setting voltage to 0)
         m_ArmSim.setInputVoltage(armInputVoltage);
 
         // Sim step
         m_ArmSim.update(Constants.Simulation.arm.simLoopPeriodSec);
-
-        // Raw sim angle (deg)
         double rawDeg = Units.radiansToDegrees(m_ArmSim.getAngleRads());
-        // Normalize for display: [-180,180], then make non-negative for dashboard
         double wrapped = ((rawDeg % 360.0) + 360.0) % 360.0;
         if (wrapped > 180.0) wrapped -= 360.0;
         AngleSimulation = Math.abs(wrapped);
-
-        // Telemetry and convenience flags
         AtAngleSimulation = Math.abs(AngleSimulation - armTargetAngleDeg) <= Constants.Simulation.arm.atAngleToleranceDeg;
 
-        // Mech2d visualization
         if (m_ArmMech2d != null) {
             m_ArmMech2d.setAngle(AngleSimulation);
             m_ArmMech2d.setLength(Constants.Simulation.arm.armLengthMeters);
         }
 
-        // Publish telemetry
         if (armAngleDegEntry != null) armAngleDegEntry.setDouble(AngleSimulation);
         if (armTargetDegEntry != null) armTargetDegEntry.setDouble(armTargetAngleDeg);
         if (armVoltageEntry != null) armVoltageEntry.setDouble(armInputVoltage);
@@ -161,7 +146,6 @@ public class Simulation extends SubsystemBase {
         this.rightEncoder = rightEncoder;
         mech = new LoggedMechanism2d(10, 10);
 
-        // Set DPP for provided encoders in sim
         this.leftEncoder.setDistancePerPulse(0.0254);
         this.rightEncoder.setDistancePerPulse(0.0254);
 
@@ -180,7 +164,7 @@ public class Simulation extends SubsystemBase {
             rightEncoderSim = new EncoderSim(this.rightEncoder);
             
             fieldSim = new Field2d();
-            SmartDashboard.putData("Field", fieldSim); // ensure Field2d appears
+            SmartDashboard.putData("Field", fieldSim); 
 
             
             drivetrainSimulator.setPose(initialPose);
@@ -191,23 +175,17 @@ public class Simulation extends SubsystemBase {
             typeEntry.setString("Differential");
             chassisSpeedsEntry = instance.getTable("Drivetrain").getEntry("ChassisSpeeds");
             poseEntry = instance.getTable("Drivetrain").getEntry("Pose");
-
-            // Add AdvantageScope vision pose publisher
             simVisionPoseEntry = instance.getTable("/AdvantageScope/Vision").getEntry("SimVisionPose");
-            // New: 2D arrays for vision and blended poses
             visionPose2dEntry = instance.getTable("/AdvantageScope/Vision").getEntry("VisionPose");
             interpPose2dEntry = instance.getTable("/AdvantageScope/Vision").getEntry("InterpolatedPose");
 
-            // Arm telemetry entries
             var armTable = instance.getTable("/AdvantageScope/Arm");
             armAngleDegEntry = armTable.getEntry("AngleDeg");
             armTargetDegEntry = armTable.getEntry("TargetAngleDeg");
             armVoltageEntry = armTable.getEntry("Voltage");
 
-            // Initialize Arm sim
             ArmInit();
 
-            // Vision sim setup
             try {
                 tagLayout = AprilTagFields.k2025Reefscape.loadAprilTagLayoutField();
             } catch (Exception e) {
