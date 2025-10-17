@@ -8,23 +8,21 @@ public final class Constants {
     public static class Mapping {
         public static class Drive {
             // Motor ID's
-            public static int Left_Middle = 0;
-            public static int Right_Middle = 2;
-            public static int Left_Front = 2;
-            public static int Left_Back = 3;
-            public static int Right_Front = 4;
-            public static int Right_Back= 5;
+
+            public static int Left_Front = 22;
+            public static int Left_Back = 1;
+            public static int Right_Front = 6;
+            public static int Right_Back= 3;
 
 
             // Invert motor
             public static boolean Left_Front_Inverted = false;
             public static boolean Right_Front_Inverted = true;
         
-            public static boolean Left_Back_Inverted = true;
+            public static boolean Left_Back_Inverted = false;
             public static boolean Right_Back_Inverted = true;
 
-            public static boolean Left_Middle_Inverted = false;
-            public static boolean Right_Middle_Inverted = true;
+
 
 
 
