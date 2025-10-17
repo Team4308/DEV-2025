@@ -18,6 +18,7 @@ import edu.wpi.first.wpilibj.RobotBase;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
@@ -119,8 +120,6 @@ public class Simulation extends SubsystemBase {
 
     private void Arm() {
         m_ArmSim.setInputVoltage(armInputVoltage);
-
-        // Sim step
         m_ArmSim.update(Constants.Simulation.arm.simLoopPeriodSec);
         double rawDeg = Units.radiansToDegrees(m_ArmSim.getAngleRads());
         double wrapped = ((rawDeg % 360.0) + 360.0) % 360.0;
@@ -179,11 +178,13 @@ public class Simulation extends SubsystemBase {
             visionPose2dEntry = instance.getTable("/AdvantageScope/Vision").getEntry("VisionPose");
             interpPose2dEntry = instance.getTable("/AdvantageScope/Vision").getEntry("InterpolatedPose");
 
+            
             var armTable = instance.getTable("/AdvantageScope/Arm");
             armAngleDegEntry = armTable.getEntry("AngleDeg");
             armTargetDegEntry = armTable.getEntry("TargetAngleDeg");
             armVoltageEntry = armTable.getEntry("Voltage");
 
+            SmartDashboard.putData("Arm 3D", mech);
             ArmInit();
 
             try {

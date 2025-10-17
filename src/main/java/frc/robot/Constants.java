@@ -8,12 +8,26 @@ public final class Constants {
     public static class Mapping {
         public static class Drive {
             // Motor ID's
-            public static int Left = 0;
-            public static int Right = 1;
-            public static int Left1 = 2;
-            public static int Left2 = 3;
-            public static int Right1 = 4;
-            public static int Right2= 5;
+            public static int Left_Middle = 0;
+            public static int Right_Middle = 2;
+            public static int Left_Front = 2;
+            public static int Left_Back = 3;
+            public static int Right_Front = 4;
+            public static int Right_Back= 5;
+
+
+            // Invert motor
+            public static boolean Left_Front_Inverted = false;
+            public static boolean Right_Front_Inverted = true;
+        
+            public static boolean Left_Back_Inverted = true;
+            public static boolean Right_Back_Inverted = true;
+
+            public static boolean Left_Middle_Inverted = false;
+            public static boolean Right_Middle_Inverted = true;
+
+
+
         }
     }
     public static class Generic {
@@ -39,6 +53,12 @@ public final class Constants {
             public static final boolean simulateGravity = true;
             public static final double simLoopPeriodSec = 0.020;  // 20ms loop
             public static final double atAngleToleranceDeg = 3.0;
+
+            // Simulation Pid since its not even close to irl tuning
+            public static final double kP = 0.61;
+            public static final double kI = 0.32;
+            public static final double kD = 0.17;
+    
         }
     }
 
@@ -60,13 +80,13 @@ public final class Constants {
         public static final double FEEDER_ANGLE = 90.0;
         public static final double GROUND_ANGLE = 0.0;
         // PID and FF
-        public static final double kP = 0.01;
-        public static final double kI = 0.0;
-        public static final double kD = 0.0;
+        public static final double kP = 0.001; // TODO: Tune
+        public static final double kI = 0.00;
+        public static final double kD = 0.00;
 
-        public static final double kS = 0.0;
-        public static final double kG = 0.5;
-        public static final double kV = 0.0;
+        public static final double kS = 0.0; // TODO: Use ReClac Again
+        public static final double kG = 0.74;
+        public static final double kV = 0.03;
 
         // Offset
         public static final double ZERO_OFFSET_DEG = 0.0;
@@ -80,7 +100,7 @@ public final class Constants {
 
     public static final class DriveConstants {
         // Drive Constants
-        public static final double trackWidthMeters = 0.6; 
+        public static final double trackWidthMeters = 0.6;  // TODO: Measure
         public static final int leftEncoderChannelA = 22; 
         public static final int leftEncoderChannelB = 9;
         public static final int rightEncoderChannelA = 13;
@@ -107,6 +127,10 @@ public final class Constants {
 
         // Tolerances
         public static final int HeadingTolerance = 1; // degrees
+    }
+
+    public static final class Deepclimb {
+        public static final int MOTORID = 10; // TODO: Change
     }
 
     public static final class Vision {

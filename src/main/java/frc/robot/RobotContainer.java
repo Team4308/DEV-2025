@@ -9,6 +9,7 @@ import frc.robot.commands.score;
 import frc.robot.commands.Sequential.CoralIntakeCommand;
 import frc.robot.commands.Sequential.DriveToCoralCommand;
 import frc.robot.subsystems.ArmSubsystem;
+import frc.robot.subsystems.DeepClimbSubsystem;
 import frc.robot.subsystems.DriveSystem;
 
 import com.pathplanner.lib.auto.AutoBuilder;
@@ -43,21 +44,27 @@ public class RobotContainer {
     SCORING,
     AUTO,
     SEEKING,
+    CLIMBING,
     IDLE,
     DISABLED
   }
-  public static BotState currentState = BotState.IDLE;
 
+  // States
+  public static BotState currentState = BotState.IDLE;
   public static boolean groundIntake = false; 
+  // Sub Sys
   public final EndEffectorSubsystem m_intakeSubsystem = new EndEffectorSubsystem();
   public final DriveSystem m_driveSystem = new DriveSystem();
   public final static ArmSubsystem m_armSubsystem = new ArmSubsystem();
   public final VisionSubsystem m_Vision = new VisionSubsystem(m_driveSystem);
+  public final DeepClimbSubsystem m_DeepClimbSubsystem = new DeepClimbSubsystem(); 
+  // Drive
   @SuppressWarnings("static-access")
   private final DifferentialDrive m_robotDrive = new DifferentialDrive(m_driveSystem.leaderLeft, m_driveSystem.leaderRight);
-
+// Controllers 
   private final XBoxWrapper driver = new XBoxWrapper(Ports.Joysticks.DRIVER);
   private final XBoxWrapper operator = new XBoxWrapper(Ports.Joysticks.OPERATOR);
+  // Auto 
   private final SendableChooser<Command> autoChooser;
 
   public RobotContainer() {
@@ -66,9 +73,11 @@ public class RobotContainer {
     CommandScheduler.getInstance().registerSubsystem(m_intakeSubsystem);
     CommandScheduler.getInstance().registerSubsystem(m_driveSystem);
     CommandScheduler.getInstance().registerSubsystem(m_Vision);
+    CommandScheduler.getInstance().registerSubsystem(m_DeepClimbSubsystem);
+    // Binds
     configureNamedCommands();
     configureBindings();
-    
+    // Auto 
     autoChooser = AutoBuilder.buildAutoChooser();
     SmartDashboard.putData("Auto Chooser", autoChooser);
   }
@@ -83,7 +92,6 @@ public class RobotContainer {
 
     driver.RB.onTrue(new InstantCommand(() -> m_driveSystem.driveToPose(m_driveSystem.nearestPoseToRightReef)));
     driver.LB.onTrue(new InstantCommand(() -> m_driveSystem.driveToPose(m_driveSystem.nearestPoseToLeftReef)));
-
     driver.A.onTrue(new InstantCommand(() -> {
       if (currentState == BotState.INTAKING) {
         currentState = BotState.SCORING;

@@ -45,7 +45,7 @@ public class ArmSubsystem extends SubsystemBase {
         SparkMaxConfig config = new SparkMaxConfig();
         config.idleMode(SparkBaseConfig.IdleMode.kBrake);
         config.encoder.positionConversionFactor(ArmConstants.DEG_PER_ENCODER_UNIT);
-        config.encoder.velocityConversionFactor(ArmConstants.DEG_PER_ENCODER_UNIT / 60.0);
+        config.encoder.velocityConversionFactor(ArmConstants.DEG_PER_ENCODER_UNIT / 60.0); // Divid by 60 for RPM to RPS
         armMotor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
         encoder = armMotor.getEncoder();
         // Starting Deg
@@ -56,9 +56,8 @@ public class ArmSubsystem extends SubsystemBase {
         targetAngle = initAngleDeg;
         controller.reset(initAngleDeg);
         controller.setGoal(targetAngle);
-        controller.setTolerance(1.0);
+        controller.setTolerance(0.5);
 
-        // Simulation update
         if (RobotBase.isSimulation() && DriveSystem.getSimulation() != null) {
             DriveSystem.getSimulation().setArmTargetAngleDeg(targetAngle);
         }
@@ -82,11 +81,9 @@ public class ArmSubsystem extends SubsystemBase {
     }
 
     private void updateTargetAngleDeg(double targetDeg) {
-        // Set Target
         targetAngle = targetDeg;
         controller.setGoal(targetAngle);
 
-        // Simulation
         if (RobotBase.isSimulation() && DriveSystem.getSimulation() != null) {
             DriveSystem.getSimulation().setArmTargetAngleDeg(targetDeg);
         }

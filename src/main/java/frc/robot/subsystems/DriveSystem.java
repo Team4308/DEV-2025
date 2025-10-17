@@ -33,7 +33,7 @@ import com.pathplanner.lib.auto.AutoBuilder;
 
 public class DriveSystem extends SubsystemBase {
     public static WPI_TalonSRX leaderLeft, leaderRight;
-    private final WPI_TalonSRX followerLeft1, followerRight1, followerLeft2, followerRight2;
+    private final WPI_TalonSRX followerLeftRear, followerRightRear, followerLeftFront, followerRightFront;
     public Encoder leftEncoder, rightEncoder;
     public static AHRS imu = new AHRS(NavXComType.kI2C);
     private DifferentialDrive diffDrive;
@@ -52,16 +52,26 @@ public class DriveSystem extends SubsystemBase {
     private DifferentialDrivePoseEstimator poseEstimator;
 
     public DriveSystem() {
-        leaderLeft = new WPI_TalonSRX(Constants.Mapping.Drive.Left);
-        leaderRight = new WPI_TalonSRX(Constants.Mapping.Drive.Right);
-        followerLeft1 = new WPI_TalonSRX(Constants.Mapping.Drive.Left1);
-        followerRight1 = new WPI_TalonSRX(Constants.Mapping.Drive.Right1);
-        followerLeft2 = new WPI_TalonSRX(Constants.Mapping.Drive.Left2);
-        followerRight2 = new WPI_TalonSRX(Constants.Mapping.Drive.Right2); 
-        followerLeft1.set(ControlMode.Follower, leaderLeft.getDeviceID());
-        followerLeft2.set(ControlMode.Follower, leaderLeft.getDeviceID());
-        followerRight1.set(ControlMode.Follower, leaderRight.getDeviceID());
-        followerRight2.set(ControlMode.Follower, leaderRight.getDeviceID());
+        leaderLeft = new WPI_TalonSRX(Constants.Mapping.Drive.Left_Middle);
+        leaderRight = new WPI_TalonSRX(Constants.Mapping.Drive.Right_Middle);
+        followerLeftRear = new WPI_TalonSRX(Constants.Mapping.Drive.Left_Back);
+        followerRightRear = new WPI_TalonSRX(Constants.Mapping.Drive.Right_Back);
+        followerLeftFront = new WPI_TalonSRX(Constants.Mapping.Drive.Left_Front);
+        followerRightFront = new WPI_TalonSRX(Constants.Mapping.Drive.Right_Front); 
+        followerLeftRear.set(ControlMode.Follower, leaderLeft.getDeviceID());
+        followerLeftFront.set(ControlMode.Follower, leaderLeft.getDeviceID());
+        followerRightRear.set(ControlMode.Follower, leaderRight.getDeviceID());
+        followerRightFront.set(ControlMode.Follower, leaderRight.getDeviceID());
+
+        leaderLeft.setInverted(Constants.Mapping.Drive.Left_Middle_Inverted);
+        leaderRight.setInverted(Constants.Mapping.Drive.Right_Middle_Inverted);
+
+        followerLeftRear.setInverted(Constants.Mapping.Drive.Left_Back_Inverted);
+        followerLeftFront.setInverted(Constants.Mapping.Drive.Left_Front_Inverted);
+
+        followerRightRear.setInverted(Constants.Mapping.Drive.Right_Back_Inverted);
+        followerRightFront.setInverted(Constants.Mapping.Drive.Right_Front_Inverted);
+
         leftEncoder = new Encoder(Constants.DriveConstants.leftEncoderChannelA, Constants.DriveConstants.leftEncoderChannelB);
         rightEncoder = new Encoder(Constants.DriveConstants.rightEncoderChannelA, Constants.DriveConstants.rightEncoderChannelB);
 
@@ -79,16 +89,13 @@ public class DriveSystem extends SubsystemBase {
         leaderRight.configPeakOutputForward(Constants.DriveConstants.peakOutputForward);
         leaderRight.configPeakOutputReverse(Constants.DriveConstants.peakOutputReverse);
 
-        leaderRight.setInverted(true);
-        followerRight1.setInverted(true);
-        followerRight2.setInverted(true);
-        
+
         m_odometry = new DifferentialDriveOdometry(
             Rotation2d.fromDegrees(getHeading()), 
             0.0, 0.0);
         
         if (RobotBase.isSimulation()) {
-            // Pass encoders into Simulation so EncoderSim updates these same encoders
+            // Sim Encoders
             simulation = new Simulation(leaderLeft, leaderRight, leftEncoder, rightEncoder);
         }
 
@@ -156,10 +163,10 @@ public class DriveSystem extends SubsystemBase {
     private void setNeutralMode(NeutralMode mode) {
         leaderLeft.setNeutralMode(mode);
         leaderRight.setNeutralMode(mode);
-        followerLeft1.setNeutralMode(mode);
-        followerLeft2.setNeutralMode(mode);
-        followerRight1.setNeutralMode(mode);
-        followerRight2.setNeutralMode(mode);
+        followerLeftRear.setNeutralMode(mode);
+        followerLeftFront.setNeutralMode(mode);
+        followerRightFront.setNeutralMode(mode);
+        followerRightRear.setNeutralMode(mode);
     }
 
     public void ToggleBrake() {
@@ -249,6 +256,8 @@ public class DriveSystem extends SubsystemBase {
     private edu.wpi.first.math.kinematics.ChassisSpeeds getRobotRelativeSpeeds() {
         return new edu.wpi.first.math.kinematics.ChassisSpeeds();
     }
+
+    
 
     private void driveRobotRelative(edu.wpi.first.math.kinematics.ChassisSpeeds speeds) {
         double forward = speeds.vxMetersPerSecond;
