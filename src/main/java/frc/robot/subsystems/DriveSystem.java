@@ -33,7 +33,7 @@ import com.pathplanner.lib.auto.AutoBuilder;
 
 public class DriveSystem extends SubsystemBase {
     public static WPI_TalonSRX leaderLeft, leaderRight;
-    private final WPI_TalonSRX followerLeftRear, followerRightRear;
+    private final WPI_TalonSRX followerLeftRear, followerRightRear, followerLeftFront, followerRightFront;
     public Encoder leftEncoder, rightEncoder;
     public static AHRS imu = new AHRS(NavXComType.kI2C);
     private DifferentialDrive diffDrive;
@@ -52,19 +52,25 @@ public class DriveSystem extends SubsystemBase {
     private DifferentialDrivePoseEstimator poseEstimator;
 
     public DriveSystem() {
-        leaderLeft = new WPI_TalonSRX(Constants.Mapping.Drive.Left_Front);
-        leaderRight = new WPI_TalonSRX(Constants.Mapping.Drive.Right_Front);
+        leaderLeft = new WPI_TalonSRX(Constants.Mapping.Drive.Left_Middle);
+        leaderRight = new WPI_TalonSRX(Constants.Mapping.Drive.Right_Middle);
         followerLeftRear = new WPI_TalonSRX(Constants.Mapping.Drive.Left_Back);
         followerRightRear = new WPI_TalonSRX(Constants.Mapping.Drive.Right_Back);
-
+        followerLeftFront = new WPI_TalonSRX(Constants.Mapping.Drive.Left_Front);
+        followerRightFront = new WPI_TalonSRX(Constants.Mapping.Drive.Right_Front); 
         followerLeftRear.set(ControlMode.Follower, leaderLeft.getDeviceID());
+        followerLeftFront.set(ControlMode.Follower, leaderLeft.getDeviceID());
         followerRightRear.set(ControlMode.Follower, leaderRight.getDeviceID());
+        followerRightFront.set(ControlMode.Follower, leaderRight.getDeviceID());
 
-        leaderLeft.setInverted(Constants.Mapping.Drive.Left_Front_Inverted);
-        leaderRight.setInverted(Constants.Mapping.Drive.Right_Front_Inverted);
+        leaderLeft.setInverted(Constants.Mapping.Drive.Left_Middle_Inverted);
+        leaderRight.setInverted(Constants.Mapping.Drive.Right_Middle_Inverted);
 
         followerLeftRear.setInverted(Constants.Mapping.Drive.Left_Back_Inverted);
+        followerLeftFront.setInverted(Constants.Mapping.Drive.Left_Front_Inverted);
+
         followerRightRear.setInverted(Constants.Mapping.Drive.Right_Back_Inverted);
+        followerRightFront.setInverted(Constants.Mapping.Drive.Right_Front_Inverted);
 
         leftEncoder = new Encoder(Constants.DriveConstants.leftEncoderChannelA, Constants.DriveConstants.leftEncoderChannelB);
         rightEncoder = new Encoder(Constants.DriveConstants.rightEncoderChannelA, Constants.DriveConstants.rightEncoderChannelB);
@@ -158,6 +164,8 @@ public class DriveSystem extends SubsystemBase {
         leaderLeft.setNeutralMode(mode);
         leaderRight.setNeutralMode(mode);
         followerLeftRear.setNeutralMode(mode);
+        followerLeftFront.setNeutralMode(mode);
+        followerRightFront.setNeutralMode(mode);
         followerRightRear.setNeutralMode(mode);
     }
 
