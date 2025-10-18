@@ -26,7 +26,7 @@ public class VisionSubsystem extends SubsystemBase {
     private CameraMode currentCamMode;
     private Pipeline currentPipeline;
     private Pose2d lastEstimatedPose;
-    private Pose2d lastVisionPose; // latest raw vision measurement used
+    private Pose2d lastVisionPose; 
     private int lastTargetCount;
 
     private double lastSimVisionTimestamp = -1.0;

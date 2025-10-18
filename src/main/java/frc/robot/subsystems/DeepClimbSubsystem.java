@@ -11,29 +11,5 @@ import frc.robot.RobotContainer.BotState;
 
 public class DeepClimbSubsystem extends SubsystemBase {
     
-    private TalonSRX motor = new TalonSRX(Constants.Deepclimb.MOTORID);
-    
-
-    public DeepClimbSubsystem() {
-        motor.configFactoryDefault();
-        motor.setInverted(false);
-        motor.configPeakOutputForward(1.0);
-        motor.configPeakOutputReverse(-1.0);
-        motor.configContinuousCurrentLimit(20, 0);
-        motor.enableCurrentLimit(true);
-        motor.setNeutralMode(NeutralMode.Brake);
-        
-    }
-
-    public void startClimb() {
-        RobotContainer.currentState = BotState.CLIMBING;
-        motor.set(ControlMode.MotionMagic.PercentOutput, 55);
-    }
-
-    public void stopClimb() {
-        RobotContainer.currentState = BotState.IDLE;
-
-        motor.set(ControlMode.MotionMagic.PercentOutput, 0);
-    }
 
 }

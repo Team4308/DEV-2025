@@ -37,21 +37,17 @@ public class DriveToCoralCommand extends Command {
 
         if (det != null) {
             lastArea = det.ta;
-            // Steering from normalized x offset
-            double steerErr = det.txnc; // -1..1, right positive
+            double steerErr = det.txnc; 
             double turn = Constants.Vision.seekSteerKp * steerErr;
 
-            // Forward speed: reduce when aligned; clamp
             double fwd = Math.abs(steerErr) < Constants.Vision.seekAlignDeadband
                 ? Constants.Vision.seekMaxFwd
                 : Math.max(Constants.Vision.seekMinFwd, Constants.Vision.seekMaxFwd * (1.0 - Math.abs(steerErr)));
 
-            // Simple arcade to tank mix
             double left = fwd + turn;
             double right = fwd - turn;
             drive.setPowerPercent(left, right);
         } else {
-            // No target: rotate to search
             drive.setPowerPercent(Constants.Vision.seekLostRotate, -Constants.Vision.seekLostRotate);
         }
     }

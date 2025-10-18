@@ -102,7 +102,6 @@ public class RobotContainer {
 
     driver.Y.onTrue(new InstantCommand(() -> groundIntake = !groundIntake));
 
-    // Hold X to seek and drive to coral for intake
     driver.X.whileTrue(new DriveToCoralCommand(m_driveSystem, m_Vision, m_intakeSubsystem));
 
     m_driveSystem.setDefaultCommand(

@@ -44,7 +44,7 @@ public final class Constants {
         public static final class arm {
             public static final int motorCount = 1;
             public static final double gearRatio = 500/1;        // 500 - 1 
-            public static final double armLengthMeters = 0.254;   /// Roughly 22 inchs (CAD)
+            public static final double armLengthMeters = 0.9144;   /// Roughly 32 inchs (CAD)
             public static final double armMassKg = 5.216312;          // Around 11.5 pounds (CAD)
             public static final double minAngleDeg = 0.0;
             public static final double maxAngleDeg = 180.0;
@@ -124,7 +124,7 @@ public final class Constants {
         public static final double ltvUpdatePeriodSec = 0.02;
 
         // Tolerances
-        public static final int HeadingTolerance = 3; // degrees
+        public static final int HeadingTolerance = 1; 
     }
 
     public static final class Vision {
