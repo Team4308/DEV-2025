@@ -27,13 +27,6 @@ public class ArmSubsystem extends SubsystemBase {
     private double targetAngle = ArmConstants.RESTING_ANGLE;
 
     public ArmSubsystem() {
-<<<<<<< HEAD
-
-        // Spark Max Config
-
-        // Spark Max Config
-=======
->>>>>>> main
         armMotor = new SparkMax(ArmConstants.ARM_MOTOR_ID, MotorType.kBrushless);
         SparkMaxConfig config = new SparkMaxConfig();
         config.idleMode(SparkBaseConfig.IdleMode.kBrake);
@@ -46,15 +39,8 @@ public class ArmSubsystem extends SubsystemBase {
         double initAngleDeg = encoder.getPosition() - ArmConstants.ZERO_OFFSET_DEG;
         targetAngle = initAngleDeg;
         controller.reset(initAngleDeg);
-<<<<<<< HEAD
-
-        if (RobotBase.isSimulation() && DriveSystem.getSimulation() != null) {
-            DriveSystem.getSimulation().setArmTargetAngleDeg(targetAngle);
-        }
-=======
         controller.setGoal(targetAngle);
         controller.setTolerance(1.0);
->>>>>>> main
     }
 
     public void moveToScoringPosition() { updateTargetAngleDeg(ArmConstants.SCORING_ANGLE); }
@@ -74,31 +60,12 @@ public class ArmSubsystem extends SubsystemBase {
     private void updateTargetAngleDeg(double targetDeg) {
         targetAngle = targetDeg;
         controller.setGoal(targetAngle);
-<<<<<<< HEAD
-
-        if (RobotBase.isSimulation() && DriveSystem.getSimulation() != null) {
-            DriveSystem.getSimulation().setArmTargetAngleDeg(targetDeg);
-        }
-=======
->>>>>>> main
     }
 
     @Override
     public void periodic() {
-<<<<<<< HEAD
-
-
-
-
-        double rawAngleDeg = (RobotBase.isSimulation() && DriveSystem.getSimulation() != null)
-            ? DriveSystem.getSimulation().getArmAngleDeg()
-            : encoder.getPosition();
-        double currentAngleDeg = RobotBase.isSimulation() ? rawAngleDeg : (rawAngleDeg - ArmConstants.ZERO_OFFSET_DEG);
-=======
         double rawAngleDeg = encoder.getPosition();
         double currentAngleDeg = rawAngleDeg - ArmConstants.ZERO_OFFSET_DEG;
->>>>>>> main
-
         double pidEffort = controller.calculate(currentAngleDeg);
         TrapezoidProfile.State sp = controller.getSetpoint();
         double ffVolts = ff.calculate(Math.toRadians(sp.position), Math.toRadians(sp.velocity));
