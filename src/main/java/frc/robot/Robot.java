@@ -37,7 +37,9 @@ public class Robot extends LoggedRobot {
 
   @Override
   public void robotPeriodic() {
+
     CommandScheduler.getInstance().run();
+    SmartDashboard.putString("Robot State", RobotContainer.currentState.toString());
     SmartDashboard.putBoolean("Intake From Ground", ((BooleanSupplier) () -> RobotContainer.groundIntake()).getAsBoolean());
   }
 

@@ -62,8 +62,8 @@ public final class Constants {
     }
 
     public static final class Intake {
-        public static final int Intake_Motor_id = 6;
-        public static final int Intake_Sensor_id = 7;
+        public static final int Intake_Motor_id = 9;
+        public static final int Intake_Sensor_id = 8;
 
         public static final double kP = 0.01;
         public static final double kI = 0.0;
@@ -73,7 +73,7 @@ public final class Constants {
 
     public static final class ArmConstants {
 
-        public static final int ARM_MOTOR_ID = 20;
+        public static final int ARM_MOTOR_ID = 7;
         public static final double SCORING_ANGLE = 35.0;
         public static final double RESTING_ANGLE = 15.0;
         public static final double FEEDER_ANGLE = 90.0;
@@ -99,11 +99,10 @@ public final class Constants {
     public static final class DriveConstants {
         // Drive Constants
         public static final double trackWidthMeters = 0.6;  // TODO: Measure
-        public static final int leftEncoderChannelA = 22; 
-        public static final int leftEncoderChannelB = 9;
-        public static final int rightEncoderChannelA = 13;
-        public static final int rightEncoderChannelB = 11;
-
+        public static final int leftEncoder = 0; 
+        public static final int rightEncoder = 1;
+        public static final double gearRatio = 1;
+        public static final double wheelDiameter = 0.1524; // 6 inches 
         // Output limits
         public static final double nominalOutputForward = 0.0;
         public static final double nominalOutputReverse = 0.0;
@@ -122,9 +121,13 @@ public final class Constants {
 
         // Controllers
         public static final double ltvUpdatePeriodSec = 0.02;
-
+        public static final double pulsesPerRotation = 4096;
         // Tolerances
-        public static final int HeadingTolerance = 1; 
+        public static final int HeadingTolerance = 1;
+
+        // Converting the encoder units to meters 
+        public static double metersPerPulse =  gearRatio * (Math.PI * wheelDiameter) * pulsesPerRotation ; 
+        
     }
 
     public static final class Vision {
@@ -163,8 +166,5 @@ public final class Constants {
         public static final double seekStopArea = 0.30;       
         public static final double seekLostRotate = 0.25;     
         public static final double seekTimeoutSec = 4.0;      
-    }
-    public static final class Deepclimb{ 
-        public static final int MOTORID = 30;
     }
 }

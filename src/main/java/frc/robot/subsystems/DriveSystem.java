@@ -6,6 +6,8 @@ import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.TalonSRXControlMode;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
+import com.ctre.phoenix6.Orchestra;
+import com.ctre.phoenix6.hardware.CANcoder;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPLTVController;
 import com.pathplanner.lib.path.GoalEndState;
@@ -34,14 +36,14 @@ import com.pathplanner.lib.auto.AutoBuilder;
 public class DriveSystem extends SubsystemBase {
     public static WPI_TalonSRX leaderLeft, leaderRight;
     private final WPI_TalonSRX followerLeftRear, followerRightRear;
-    public Encoder leftEncoder, rightEncoder;
+    public CANcoder leftEncoder, rightEncoder;
     public static AHRS imu = new AHRS(NavXComType.kI2C);
     private DifferentialDrive diffDrive;
-    private DifferentialDriveOdometry m_odometry;
+    public DifferentialDriveOdometry m_odometry;
     public static Simulation simulation;
     private RobotConfig config;
     private Pose2d targetPose = new Pose2d();
-
+    public Simulation sim;
     public Pose2d nearestPoseToLeftReef = new Pose2d();
     public Pose2d nearestPoseToRightReef = new Pose2d();
     public Pose2d nearestPoseToAlgaeRemove = new Pose2d();
@@ -50,6 +52,8 @@ public class DriveSystem extends SubsystemBase {
 
     private final DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(Constants.DriveConstants.trackWidthMeters);
     private DifferentialDrivePoseEstimator poseEstimator;
+
+    private Orchestra orchestra;
 
     public DriveSystem() {
         leaderLeft = new WPI_TalonSRX(Constants.Mapping.Drive.Left_Front);
@@ -66,8 +70,13 @@ public class DriveSystem extends SubsystemBase {
         followerLeftRear.setInverted(Constants.Mapping.Drive.Left_Back_Inverted);
         followerRightRear.setInverted(Constants.Mapping.Drive.Right_Back_Inverted);
 
-        leftEncoder = new Encoder(Constants.DriveConstants.leftEncoderChannelA, Constants.DriveConstants.leftEncoderChannelB);
-        rightEncoder = new Encoder(Constants.DriveConstants.rightEncoderChannelA, Constants.DriveConstants.rightEncoderChannelB);
+        leftEncoder = new CANcoder(Constants.DriveConstants.leftEncoder);
+        rightEncoder = new CANcoder(Constants.DriveConstants.rightEncoder);
+
+        // Phoenix v5 Orchestra with TalonSRX leaders
+        orchestra = new Orchestra();
+        // orchestra.addInstrument(leaderLeft);
+        // orchestra.addInstrument(leaderRight);
 
         setNeutralMode(NeutralMode.Brake);
         
@@ -83,16 +92,18 @@ public class DriveSystem extends SubsystemBase {
         leaderRight.configPeakOutputForward(Constants.DriveConstants.peakOutputForward);
         leaderRight.configPeakOutputReverse(Constants.DriveConstants.peakOutputReverse);
 
+        if (RobotBase.isSimulation()) {
+          
+          Encoder SIMleftEncoder = new Encoder(0, 1);
+          Encoder SIMrightEncoder = new Encoder(2, 3);
+
+          sim = new Simulation(leaderLeft, leaderRight, SIMleftEncoder, SIMrightEncoder);
+      }
 
         m_odometry = new DifferentialDriveOdometry(
             Rotation2d.fromDegrees(getHeading()), 
             0.0, 0.0);
-        
-        if (RobotBase.isSimulation()) {
-            // Sim Encoders
-            simulation = new Simulation(leaderLeft, leaderRight, leftEncoder, rightEncoder);
-        }
-
+    
         poseEstimator = new DifferentialDrivePoseEstimator(
             kinematics,
             Rotation2d.fromDegrees(getHeading()),
@@ -215,14 +226,14 @@ public class DriveSystem extends SubsystemBase {
             return simulation.getLeftDistanceMeters();
         }
 
-        return leftEncoder.getDistance();
+        return leftEncoder.getPosition().getValueAsDouble();
     }
     
     public double getRightDistanceMeters() {
         if (RobotBase.isSimulation() && simulation != null) {
             return simulation.getRightDistanceMeters();
         }
-        return rightEncoder.getDistance();
+        return rightEncoder.getPosition().getValueAsDouble();
     }
 
     public void resetSimPose() {
@@ -393,6 +404,33 @@ public class DriveSystem extends SubsystemBase {
 
         public static Simulation getSimulation() {
         return simulation;
+    }
+
+    // Play a .chrp file from src/main/deploy (pass just the filename, e.g. "song.chrp")
+    public boolean playSong(String chrpFilename) {
+        var status = orchestra.loadMusic(chrpFilename);
+        if (status.isOK()) {
+            orchestra.play();
+            return true;
+        }
+        System.out.println("Orchestra load failed: " + status.toString());
+        return false;
+    }
+
+    public void stopSong() {
+        if (orchestra != null) {
+            orchestra.stop();
+        }
+    }
+
+    public void pauseSong() {
+        if (orchestra != null) {
+            orchestra.pause();
+        }
+    }
+
+    public boolean isSongPlaying() {
+        return orchestra != null && orchestra.isPlaying();
     }
 
 }
