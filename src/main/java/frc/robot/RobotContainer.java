@@ -102,11 +102,6 @@ public class RobotContainer {
 
     driver.Y.onTrue(new InstantCommand(() -> groundIntake = !groundIntake));
 
-    driver.X.whileTrue(new DriveToCoralCommand(m_driveSystem, m_Vision, m_intakeSubsystem));
-
-    // Play/stop CTRE Orchestra from /deploy
-    driver.B.onTrue(new InstantCommand(() -> m_driveSystem.playSong("orchestra.chrp")));
-    driver.Back.onTrue(new InstantCommand(() -> m_driveSystem.stopSong()));
 
     m_driveSystem.setDefaultCommand(
       new RunCommand(
