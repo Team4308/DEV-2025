@@ -6,7 +6,6 @@ import frc.robot.Constants;
 import frc.robot.subsystems.DriveSystem;
 import frc.robot.subsystems.EndEffectorSubsystem;
 import frc.robot.subsystems.Vision.VisionSubsystem;
-import frc.robot.subsystems.Vision.LimelightHelpers;
 
 public class DriveToCoralCommand extends Command {
     private final DriveSystem drive;
@@ -33,23 +32,23 @@ public class DriveToCoralCommand extends Command {
 
     @Override
     public void execute() {
-        LimelightHelpers.RawDetection det = vision.getBestCoralDetection();
+        // det = vision;
 
-        if (det != null) {
-            lastArea = det.ta;
-            double steerErr = det.txnc; 
-            double turn = Constants.Vision.seekSteerKp * steerErr;
+        // if (det != null) {
+        //     lastArea = det.ta;
+        //     double steerErr = det.txnc; 
+        //     double turn = Constants.Vision.seekSteerKp * steerErr;
 
-            double fwd = Math.abs(steerErr) < Constants.Vision.seekAlignDeadband
-                ? Constants.Vision.seekMaxFwd
-                : Math.max(Constants.Vision.seekMinFwd, Constants.Vision.seekMaxFwd * (1.0 - Math.abs(steerErr)));
+        //     double fwd = Math.abs(steerErr) < Constants.Vision.seekAlignDeadband
+        //         ? Constants.Vision.seekMaxFwd
+        //         : Math.max(Constants.Vision.seekMinFwd, Constants.Vision.seekMaxFwd * (1.0 - Math.abs(steerErr)));
 
-            double left = fwd + turn;
-            double right = fwd - turn;
-            drive.setPowerPercent(left, right);
-        } else {
-            drive.setPowerPercent(Constants.Vision.seekLostRotate, -Constants.Vision.seekLostRotate);
-        }
+        //     double left = fwd + turn;
+        //     double right = fwd - turn;
+        //     drive.setPowerPercent(left, right);
+        // } else {
+        //     drive.setPowerPercent(Constants.Vision.seekLostRotate, -Constants.Vision.seekLostRotate);
+        // }
     }
 
     @Override

@@ -4,31 +4,7 @@ public final class Constants {
     public static final class LoggedDashboard {
         public static final boolean TUNING_MODE = false;
     }
-    
-    public static class Mapping {
-        public static class Drive {
-            // Motor ID's
 
-            // TODO: CHANGE IDS AGAIN 
-            public static int Left_Front = 1;
-            public static int Left_Back = 2;
-
-            public static int Right_Front = 3;
-            public static int Right_Back= 4;
-
-            // Invert motor
-
-            // NOTE: Front is leader everyrthing else is follower
-            public static boolean Left_Front_Inverted = false;
-            public static boolean Right_Front_Inverted = true;
-        
-            public static boolean Left_Back_Inverted = true;
-            public static boolean Right_Back_Inverted = false;
-
-
-
-        }
-    }
     public static class Generic {
         public static int timeoutMs = 3000;
     }
@@ -39,25 +15,20 @@ public final class Constants {
             public static int fps = 22;
             public static int AvgLatencyMs = 20;
             public static int LatencyStdDevMs = 50;
-        } 
+        }
 
         public static final class arm {
             public static final int motorCount = 1;
-            public static final double gearRatio = 500/1;        // 500 - 1 
-            public static final double armLengthMeters = 0.9144;   /// Roughly 32 inchs (CAD)
-            public static final double armMassKg = 5.216312;          // Around 11.5 pounds (CAD)
+            public static final double gearRatio = 500 / 1; // 500 - 1
+            public static final double armLengthMeters = 0.9144; /// Roughly 32 inchs (CAD)
+            public static final double armMassKg = 5.216312; // Around 11.5 pounds (CAD)
             public static final double minAngleDeg = 0.0;
             public static final double maxAngleDeg = 180.0;
-            public static final double armOffsetDeg = 0;      
+            public static final double armOffsetDeg = 0;
             public static final boolean simulateGravity = true;
-            public static final double simLoopPeriodSec = 0.020;  // 20ms loop
+            public static final double simLoopPeriodSec = 0.020; // 20ms loop
             public static final double atAngleToleranceDeg = 3.0;
 
-            // Simulation Pid since its not even close to irl tuning
-            public static final double kP = 0.61;
-            public static final double kI = 0.32;
-            public static final double kD = 0.17;
-    
         }
     }
 
@@ -68,16 +39,16 @@ public final class Constants {
         public static final double kP = 0.01;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
-        
+
     }
 
     public static final class ArmConstants {
 
-        public static final int ARM_MOTOR_ID = 7;
+        public static final int ARM_MOTOR_ID = 12;
         public static final double SCORING_ANGLE = 35.0;
         public static final double RESTING_ANGLE = 15.0;
         public static final double FEEDER_ANGLE = 90.0;
-        public static final double  GROUND_ANGLE = 0.0;
+        public static final double GROUND_ANGLE = 0.0;
         public static final double kP = 0.01;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
@@ -91,18 +62,18 @@ public final class Constants {
         public static final double GEAR_RATIO = 500.0;
         public static final double DEG_PER_ENCODER_UNIT = 360.0 / GEAR_RATIO;
 
-        // Profiling 
+        // Profiling
         public static final double MAX_VEL_DEG_PER_S = 120.0;
         public static final double MAX_ACC_DEG_PER_S2 = 360.0;
     }
 
     public static final class DriveConstants {
         // Drive Constants
-        public static final double trackWidthMeters = 0.6;  // TODO: Measure
-        public static final int leftEncoder = 0; 
+        public static final double trackWidthMeters = 0.6;
+        public static final int leftEncoder = 0;
         public static final int rightEncoder = 1;
-        public static final double gearRatio = 1;
-        public static final double wheelDiameter = 0.1524; // 6 inches 
+        public static final double gearRatio = 7 / 125;
+        public static final double wheelDiameter = 0.1524;
         // Output limits
         public static final double nominalOutputForward = 0.0;
         public static final double nominalOutputReverse = 0.0;
@@ -125,13 +96,24 @@ public final class Constants {
         // Tolerances
         public static final int HeadingTolerance = 1;
 
-        // Converting the encoder units to meters 
-        public static double metersPerPulse =  gearRatio * (Math.PI * wheelDiameter) * pulsesPerRotation ; 
-        
+        // Converting the encoder units to meters
+        public static double metersPerPulse = gearRatio * (Math.PI * wheelDiameter) * pulsesPerRotation;
+
+        // Motor ID's
+
+        public static int Left_Front = 1;
+        public static int Left_Back = 2;
+        public static int Right_Front = 3;
+        public static int Right_Back = 4;
+        public static boolean Left_Front_Inverted = false;
+        public static boolean Right_Front_Inverted = true;
+
+        public static boolean Left_Back_Inverted = true;
+        public static boolean Right_Back_Inverted = true;
+
     }
 
     public static final class Vision {
-        public static final String LIMELIGHT_TABLE_NAME = "limelight";
         public static final double camOffsetFront = 0;
         public static final double camOffsetSide = 0;
         public static final double camOffsetUp = 0;
@@ -142,9 +124,9 @@ public final class Constants {
         public static final double maxGyroRate = 360.0;
         public static final int minTagsForVision = 2;
         public static final double visionMaxTranslationErrorMeters = 0.35; // tune
-        public static final double visionMaxYawErrorDeg = 10.0;            // tune
+        public static final double visionMaxYawErrorDeg = 10.0; // tune
 
-        // Estimator 
+        // Estimator
         public static final double stateStdDevPosMeters = 0.05;
         public static final double stateStdDevThetaDeg = 5.0;
         public static final double visionStdDevPosMeters = 0.5;
@@ -152,19 +134,16 @@ public final class Constants {
 
         public static final double simVisionStdDevPosMeters = 0.3;
         public static final double simVisionStdDevThetaDeg = 5.0;
-        public static final double simUpdatePeriodSec = 0.05;  
+        public static final double simUpdatePeriodSec = 0.05;
         public static final double simLatencyMs = 1.0;
 
-
-        public static final int coralClassId = 0; // TODO: Change to the real id 
-
         // Seek
-        public static final double seekSteerKp = 0.8;         
-        public static final double seekMaxFwd = 0.4;         
-        public static final double seekMinFwd = 0.15;         
-        public static final double seekAlignDeadband = 0.05;  
-        public static final double seekStopArea = 0.30;       
-        public static final double seekLostRotate = 0.25;     
-        public static final double seekTimeoutSec = 4.0;      
+        public static final double seekSteerKp = 0.8;
+        public static final double seekMaxFwd = 0.4;
+        public static final double seekMinFwd = 0.15;
+        public static final double seekAlignDeadband = 0.05;
+        public static final double seekStopArea = 0.30;
+        public static final double seekLostRotate = 0.25;
+        public static final double seekTimeoutSec = 4.0;
     }
 }

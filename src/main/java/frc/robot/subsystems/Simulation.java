@@ -18,7 +18,6 @@ import edu.wpi.first.wpilibj.RobotBase;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
-import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
@@ -275,7 +274,6 @@ public class Simulation extends SubsystemBase {
             visionSim.update(poseForVision);
 
             var result = photonCamera.getLatestResult();
-            NetworkTable limelight = NetworkTableInstance.getDefault().getTable(frc.robot.Constants.Vision.LIMELIGHT_TABLE_NAME);
             if (result != null) {
                 int tagCount = result.hasTargets() ? result.getTargets().size() : 0;
 
@@ -317,40 +315,26 @@ public class Simulation extends SubsystemBase {
                             latestVisionEstimate.pose.getRotation().getDegrees(),
                             latencyMs
                         };
-                        limelight.getEntry("tv").setDouble(1.0);
-                        limelight.getEntry("botpose_wpiblue").setDoubleArray(botpose);
-                        limelight.getEntry("pipeline").setNumber(0);
-                        limelight.getEntry("camMode").setNumber(0);
-                        limelight.getEntry("tc").setNumber(tagCount);
+
                         NetworkTableInstance.getDefault()
                             .getTable("/AdvantageScope/Vision")
                             .getEntry("TagCount")
                             .setDouble(tagCount);
                     } else {
-                        // Targets but no pose estimate: no valid target for LL consumers
-                        limelight.getEntry("tv").setDouble(0.0);
-                        limelight.getEntry("botpose_wpiblue").setDoubleArray(new double[0]);
-                        limelight.getEntry("tc").setNumber(tagCount);
+
                         NetworkTableInstance.getDefault()
                             .getTable("/AdvantageScope/Vision")
                             .getEntry("TagCount")
                             .setDouble(tagCount);
                     }
                 } else {
-                    // No targets: clear LL outputs
-                    limelight.getEntry("tv").setDouble(0.0);
-                    limelight.getEntry("botpose_wpiblue").setDoubleArray(new double[0]);
-                    limelight.getEntry("tc").setNumber(0);
+
                     NetworkTableInstance.getDefault()
                         .getTable("/AdvantageScope/Vision")
                         .getEntry("TagCount")
                         .setDouble(0);
                 }
             } else {
-                // No result at all: clear LL outputs
-                limelight.getEntry("tv").setDouble(0.0);
-                limelight.getEntry("botpose_wpiblue").setDoubleArray(new double[0]);
-                limelight.getEntry("tc").setNumber(0);
                 NetworkTableInstance.getDefault()
                     .getTable("/AdvantageScope/Vision")
                     .getEntry("TagCount")
