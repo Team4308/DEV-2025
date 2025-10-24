@@ -58,8 +58,8 @@ public final class Constants {
         public static final double kD = 0.0;
 
         public static final double kS = 0.0; // TODO: Use ReClac Again
-        public static final double kG = 0.74;
-        public static final double kV = 0.03;
+        public static final double kG = 0.19;
+        public static final double kV = 0.74;
 
         // Offset
         public static final double ZERO_OFFSET_DEG = 0.0;
