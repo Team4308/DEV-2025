@@ -1,6 +1,11 @@
 package frc.robot.subsystems;
 
 
+import javax.swing.table.TableColumn;
+
+import com.ctre.phoenix.motorcontrol.TalonSRXControlMode;
+import com.ctre.phoenix.motorcontrol.can.TalonSRX;
+import com.ctre.phoenix.motorcontrol.can.TalonSRXConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.NeutralModeValue;
@@ -17,18 +22,16 @@ import frc.robot.commands.score;
 import frc.robot.commands.Sequential.CoralIntakeCommand;
 
 public class EndEffectorSubsystem extends SubsystemBase  {
-    private final TalonFX intakeMotor = new TalonFX(Intake.Intake_Motor_id);
+    private final TalonSRX intakeMotor = new TalonSRX(Intake.Intake_Motor_id);
     public final DigitalInput intakeSensor = new DigitalInput(Intake.Intake_Sensor_id);
 
     public EndEffectorSubsystem() {
-        TalonFXConfiguration config = new TalonFXConfiguration();
-        config.Slot0.kP = Intake.kP;
-        config.Slot0.kI = Intake.kI;
-        config.Slot0.kD = Intake.kD;
-
-        
-        intakeMotor.setNeutralMode(NeutralModeValue.Brake);
-        intakeMotor.getConfigurator().apply(config);
+        TalonSRXConfiguration intakeConfig = new TalonSRXConfiguration();
+        intakeConfig.slot0.kP = Intake.kP;
+        intakeConfig.slot0.kI = Intake.kI;
+        intakeConfig.slot0.kD = Intake.kD;
+        intakeMotor.configAllSettings(intakeConfig);
+        intakeMotor.setNeutralMode(com.ctre.phoenix.motorcontrol.NeutralMode.Brake);
     }
 
     public void setInverted(boolean inverted) {
@@ -36,16 +39,15 @@ public class EndEffectorSubsystem extends SubsystemBase  {
     }
 
     public void setMotorSpeed(double percent) {
-
-        intakeMotor.set(percent);
+        intakeMotor.set(TalonSRXControlMode.PercentOutput, percent);
     }
     public void stop() {
-        intakeMotor.set(0);
+        intakeMotor.set(TalonSRXControlMode.PercentOutput, 0);
     }
 
 
     public void intake() {
-        setMotorSpeed(0.25);
+        setMotorSpeed(0.35);
     }
 
     public void outtake() {
@@ -55,7 +57,7 @@ public class EndEffectorSubsystem extends SubsystemBase  {
     @Override
     public void periodic() {
         SmartDashboard.putBoolean("Coral Intook", intakeSensor.get());
-        SmartDashboard.putNumber("Intake Motor Speed", intakeMotor.get());
+        SmartDashboard.putNumber("Intake Motor Speed", intakeMotor.getMotorOutputPercent());
     
 
         if (RobotContainer.currentState == BotState.INTAKING) {

@@ -184,7 +184,6 @@ public class VisionSubsystem extends SubsystemBase {
         return lastTargetCount;
     }
 
-    // Decide if the vision pose is close enough to odometry/gyro to trust
     private boolean isPoseCloseToOdom(Pose2d visionPose) {
         Pose2d odomPose = drive.getPose();
         double transErr = odomPose.getTranslation().getDistance(visionPose.getTranslation());

@@ -224,14 +224,12 @@ public class Simulation extends SubsystemBase {
             visionSim.addCamera(photonCameraSim, robotToCam3d);
 
             encoderOdomPoseEntry = instance.getTable("/AdvantageScope/Drive").getEntry("EncoderOdomPose");
-            // Initialize sim odometry from current heading and starting distances
             simOdometry = new DifferentialDriveOdometry(
                 Rotation2d.fromDegrees(headingDeg), 0.0, 0.0, initialPose
             );
         }
     }
 
-    // Allow DriveSystem to feed sim with commanded percents
     public void setOpenLoopPercents(double left, double right) {
         leftOpenLoop = left;
         rightOpenLoop = right;

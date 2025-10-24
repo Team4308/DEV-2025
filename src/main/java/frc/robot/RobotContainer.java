@@ -75,8 +75,6 @@ public class RobotContainer {
     CommandScheduler.getInstance().registerSubsystem(m_driveSystem);
     CommandScheduler.getInstance().registerSubsystem(m_Vision);
     CommandScheduler.getInstance().registerSubsystem(m_DeepClimbSubsystem);
-    // Disable MotorSafety on the unused DifferentialDrive instance
-    m_robotDrive.setSafetyEnabled(false);
     // Binds
     configureNamedCommands();
     configureBindings();
@@ -111,8 +109,10 @@ public class RobotContainer {
         () -> {
           double xSpeed = -driver.getLeftY();
           double zRotation = driver.getLeftX();
-          // Use MM on real robot, open-loop in sim
+
+          // Enable / Disable motion magic for drive system 
           boolean useMM = !RobotBase.isSimulation();
+
           m_driveSystem.arcadeDriveClosedLoop(xSpeed, zRotation, useMM);
         },
         m_driveSystem
@@ -135,9 +135,14 @@ public class RobotContainer {
   //  } else {
   //   operator.A.onTrue(new score(m_intakeSubsystem, m_armSubsystem));
   //  }
-
+  
+  
     
+
+
   }
+
+
 
   public static boolean groundIntake() {
     return groundIntake;

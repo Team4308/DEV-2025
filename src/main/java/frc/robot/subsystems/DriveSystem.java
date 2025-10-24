@@ -441,9 +441,6 @@ public class DriveSystem extends SubsystemBase {
     double now = Timer.getFPGATimestamp();
     double dt = Math.max(0.0, now - lastTs);
     lastTs = now;
-
-    useMM = false;
-
     if (useMM) {
       double v = xSpeed * Constants.DriveConstants.maxLinearSpeedMps;
       double omega = zRotation * Constants.DriveConstants.maxAngularSpeedRadPerSec;

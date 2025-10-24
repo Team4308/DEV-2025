@@ -14,12 +14,14 @@ public final class Constants {
     public static class Simulation {
 
         public static class Camera {
+            // For limelight
             public static int fps = 22;
             public static int AvgLatencyMs = 20;
             public static int LatencyStdDevMs = 50;
         }
 
         public static final class arm {
+
             public static final int motorCount = 1;
             public static final double gearRatio = 500 / 1; // 500 - 1
             public static final double armLengthMeters = 0.9144; /// Roughly 32 inchs (CAD)
