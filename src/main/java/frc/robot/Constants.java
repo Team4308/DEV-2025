@@ -38,7 +38,7 @@ public final class Constants {
         public static final int Intake_Motor_id = 9;
         public static final int Intake_Sensor_id = 8;
 
-        public static final double kP = 0.01;
+        public static final double kP = 1;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
@@ -51,7 +51,7 @@ public final class Constants {
         public static final double RESTING_ANGLE = 15.0;
         public static final double FEEDER_ANGLE = 90.0;
         public static final double GROUND_ANGLE = 0.0;
-        public static final double kP = 0.01;
+        public static final double kP = 1;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
@@ -74,7 +74,7 @@ public final class Constants {
         public static final double trackWidthMeters = 0.635;
         public static final int leftEncoder = 7;
         public static final int rightEncoder = 8;
-        public static final double gearRatio = 125 / 7;
+        public static final double gearRatio = 125.0 / 7.0;
         public static final double wheelDiameter = Units.inchesToMeters(6.0);
         // Output limits
         public static final double nominalOutputForward = 0.0;
@@ -126,10 +126,6 @@ public final class Constants {
         public static final double mm_kD = 0.0;
         public static final double mm_kF = 0.0;
 
-        public static final int mmCruiseVel_ticksPer100ms = 12000;
-        public static final int mmAccel_ticksPer100msPerSec = 24000;
-
-        public static final double straightenKp = 0.4;
     }
 
     public static final class Vision {
@@ -155,6 +151,12 @@ public final class Constants {
         public static final double simVisionStdDevThetaDeg = 5.0;
         public static final double simUpdatePeriodSec = 0.05;
         public static final double simLatencyMs = 1.0;
+
+        // Coral detection config (Object Detection on cam1)
+        public static final int cam0TagPipelineIndex = 0;
+        public static final int cam1CoralPipelineIndex = 1; // OD pipeline index on photonvision2
+        public static final int coralId = 1; // class name in your OD model
+        public static final double coralTargetHeightMeters = 0.05;
 
         // Seek
         public static final double seekSteerKp = 0.8;

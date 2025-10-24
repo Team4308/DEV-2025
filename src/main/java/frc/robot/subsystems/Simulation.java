@@ -148,8 +148,8 @@ public class Simulation extends SubsystemBase {
         kinematics = new DifferentialDriveKinematics(0.65);
         if (RobotBase.isSimulation()) {
             drivetrainSimulator = new DifferentialDrivetrainSim(
-                DCMotor.getCIM(4),
-                125/7,
+                DCMotor.getCIM(2),
+                Constants.DriveConstants.gearRatio,
                 3.0,
                 60.0,
                 Constants.DriveConstants.wheelDiameter / 2.0,

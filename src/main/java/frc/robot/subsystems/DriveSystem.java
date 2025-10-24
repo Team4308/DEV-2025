@@ -2,7 +2,6 @@ package frc.robot.subsystems;
 
 import java.util.List;
 
-
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.TalonSRXControlMode;
@@ -40,7 +39,7 @@ import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 
 public class DriveSystem extends SubsystemBase {
-  // Motors 
+  // Motors
   public static WPI_TalonSRX leaderLeft, leaderRight;
   private final WPI_TalonSRX followerLeftRear, followerRightRear;
   // Sensors
@@ -52,7 +51,6 @@ public class DriveSystem extends SubsystemBase {
   public static Simulation simulation;
   private RobotConfig config;
   private Pose2d targetPose = new Pose2d();
-
 
   private final DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(
       Constants.DriveConstants.trackWidthMeters);
@@ -82,8 +80,8 @@ public class DriveSystem extends SubsystemBase {
     leftEncoder = new CANcoder(Constants.DriveConstants.leftEncoder);
     rightEncoder = new CANcoder(Constants.DriveConstants.rightEncoder);
 
-    configureClosedLoop(leaderLeft, Constants.DriveConstants.leftEncoder);
-    configureClosedLoop(leaderRight, Constants.DriveConstants.rightEncoder);
+    configMotors(leaderLeft, Constants.DriveConstants.leftEncoder);
+    configMotors(leaderRight, Constants.DriveConstants.rightEncoder);
 
     leftTargetMeters = getLeftDistanceMeters();
     rightTargetMeters = getRightDistanceMeters();
@@ -128,7 +126,7 @@ public class DriveSystem extends SubsystemBase {
     }
     AutoBuilder.configure(
         this::getPose,
-        pose -> resetHeading(),
+        this::resetPose,
         this::getRobotRelativeSpeeds,
         (speeds, feedforwards) -> driveRobotRelative(speeds),
         new PPLTVController(Constants.DriveConstants.ltvUpdatePeriodSec),
@@ -144,7 +142,9 @@ public class DriveSystem extends SubsystemBase {
         this);
   }
 
-  private void configureClosedLoop(WPI_TalonSRX talon, int cancoderId) {
+  private void configMotors(WPI_TalonSRX talon, int cancoderId) {
+
+    // Magic Motion config
     int to = 100;
     talon.configRemoteFeedbackFilter(cancoderId, RemoteSensorSource.CANCoder, 0, to);
     talon.configSelectedFeedbackSensor(FeedbackDevice.RemoteSensor0, 0, to);
@@ -154,9 +154,6 @@ public class DriveSystem extends SubsystemBase {
     talon.config_kI(0, Constants.DriveConstants.mm_kI, to);
     talon.config_kD(0, Constants.DriveConstants.mm_kD, to);
     talon.config_kF(0, Constants.DriveConstants.mm_kF, to);
-
-    talon.configMotionCruiseVelocity(Constants.DriveConstants.mmCruiseVel_ticksPer100ms, to);
-    talon.configMotionAcceleration(Constants.DriveConstants.mmAccel_ticksPer100msPerSec, to);
   }
 
   @Override
@@ -172,7 +169,7 @@ public class DriveSystem extends SubsystemBase {
         getLeftDistanceMeters(),
         getRightDistanceMeters());
 
-    // Meters travelled 
+    // Meters travelled
     SmartDashboard.putNumber("Drive/LeftMeters", getLeftDistanceMeters());
     SmartDashboard.putNumber("Drive/RightMeters", getRightDistanceMeters());
     SmartDashboard.putNumber("Drive/AvgMeters", 0.5 * (getLeftDistanceMeters() + getRightDistanceMeters()));
@@ -445,9 +442,7 @@ public class DriveSystem extends SubsystemBase {
     double dt = Math.max(0.0, now - lastTs);
     lastTs = now;
 
-    if (RobotBase.isSimulation()) {
-      useMM = false;
-    }
+    useMM = false;
 
     if (useMM) {
       double v = xSpeed * Constants.DriveConstants.maxLinearSpeedMps;
@@ -466,16 +461,8 @@ public class DriveSystem extends SubsystemBase {
       leaderLeft.set(TalonSRXControlMode.MotionMagic, leftTicks);
       leaderRight.set(TalonSRXControlMode.MotionMagic, rightTicks);
     } else {
-      double straighten = 0.0;
-      boolean straightMode = Math.abs(xSpeed) > 0.05 && Math.abs(zRotation) < 0.2;
-      if (straightMode) {
-        double distErr = getLeftDistanceMeters() - getRightDistanceMeters();
-        straighten = Constants.DriveConstants.straightenKp * distErr;
-      }
-
-      double left = xSpeed + zRotation - straighten;
-      double right = xSpeed - zRotation + straighten;
-
+      double left = xSpeed + zRotation;
+      double right = xSpeed - zRotation;
       setPowerPercent(left, right);
     }
   }
