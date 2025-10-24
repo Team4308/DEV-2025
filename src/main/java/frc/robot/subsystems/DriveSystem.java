@@ -1,6 +1,8 @@
 package frc.robot.subsystems;
 
 import java.util.List;
+
+
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.TalonSRXControlMode;
@@ -17,7 +19,6 @@ import com.pathplanner.lib.path.Waypoint;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -32,23 +33,26 @@ import frc.robot.FieldLayout;
 import com.studica.frc.AHRS;
 import com.studica.frc.AHRS.NavXComType;
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.ctre.phoenix.motorcontrol.FeedbackDevice;
+import com.ctre.phoenix.motorcontrol.RemoteSensorSource;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.Encoder;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 
 public class DriveSystem extends SubsystemBase {
+  // Motors 
   public static WPI_TalonSRX leaderLeft, leaderRight;
   private final WPI_TalonSRX followerLeftRear, followerRightRear;
-  public CANcoder leftEncoder, rightEncoder;
+  // Sensors
+  private final CANcoder leftEncoder, rightEncoder;
   public static AHRS imu = new AHRS(NavXComType.kI2C);
+
   private DifferentialDrive diffDrive;
   public DifferentialDriveOdometry m_odometry;
   public static Simulation simulation;
   private RobotConfig config;
   private Pose2d targetPose = new Pose2d();
-  public Simulation sim;
-  public Pose2d nearestPoseToLeftReef = new Pose2d();
-  public Pose2d nearestPoseToRightReef = new Pose2d();
-  public Pose2d nearestPoseToAlgaeRemove = new Pose2d();
-  public Pose2d nearestPoseToFarCoralStation = new Pose2d();
-  public Pose2d nearestPoseToNearCoralStation = new Pose2d();
+
 
   private final DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(
       Constants.DriveConstants.trackWidthMeters);
@@ -56,11 +60,16 @@ public class DriveSystem extends SubsystemBase {
 
   private Orchestra orchestra;
 
+  private double leftTargetMeters = 0.0;
+  private double rightTargetMeters = 0.0;
+  private double lastTs = Timer.getFPGATimestamp();
+
   public DriveSystem() {
     leaderLeft = new WPI_TalonSRX(Constants.DriveConstants.Left_Front);
     leaderRight = new WPI_TalonSRX(Constants.DriveConstants.Right_Front);
     followerLeftRear = new WPI_TalonSRX(Constants.DriveConstants.Left_Back);
     followerRightRear = new WPI_TalonSRX(Constants.DriveConstants.Right_Back);
+
     followerLeftRear.set(ControlMode.Follower, leaderLeft.getDeviceID());
     followerRightRear.set(ControlMode.Follower, leaderRight.getDeviceID());
 
@@ -73,9 +82,14 @@ public class DriveSystem extends SubsystemBase {
     leftEncoder = new CANcoder(Constants.DriveConstants.leftEncoder);
     rightEncoder = new CANcoder(Constants.DriveConstants.rightEncoder);
 
+    configureClosedLoop(leaderLeft, Constants.DriveConstants.leftEncoder);
+    configureClosedLoop(leaderRight, Constants.DriveConstants.rightEncoder);
+
+    leftTargetMeters = getLeftDistanceMeters();
+    rightTargetMeters = getRightDistanceMeters();
+    lastTs = Timer.getFPGATimestamp();
+
     orchestra = new Orchestra();
-    // orchestra.addInstrument(leaderLeft);
-    // orchestra.addInstrument(leaderRight);
 
     setNeutralMode(NeutralMode.Brake);
 
@@ -92,11 +106,8 @@ public class DriveSystem extends SubsystemBase {
     leaderRight.configPeakOutputReverse(Constants.DriveConstants.peakOutputReverse);
 
     if (RobotBase.isSimulation()) {
-
-      Encoder SIMleftEncoder = new Encoder(0, 1);
-      Encoder SIMrightEncoder = new Encoder(2, 3);
-
-      sim = new Simulation(leaderLeft, leaderRight, SIMleftEncoder, SIMrightEncoder);
+      simulation = new Simulation(new Encoder(0, 1), new Encoder(2, 3));
+      CommandScheduler.getInstance().registerSubsystem(simulation);
     }
 
     m_odometry = new DifferentialDriveOdometry(
@@ -133,8 +144,24 @@ public class DriveSystem extends SubsystemBase {
         this);
   }
 
+  private void configureClosedLoop(WPI_TalonSRX talon, int cancoderId) {
+    int to = 100;
+    talon.configRemoteFeedbackFilter(cancoderId, RemoteSensorSource.CANCoder, 0, to);
+    talon.configSelectedFeedbackSensor(FeedbackDevice.RemoteSensor0, 0, to);
+    talon.setSensorPhase(false);
+
+    talon.config_kP(0, Constants.DriveConstants.mm_kP, to);
+    talon.config_kI(0, Constants.DriveConstants.mm_kI, to);
+    talon.config_kD(0, Constants.DriveConstants.mm_kD, to);
+    talon.config_kF(0, Constants.DriveConstants.mm_kF, to);
+
+    talon.configMotionCruiseVelocity(Constants.DriveConstants.mmCruiseVel_ticksPer100ms, to);
+    talon.configMotionAcceleration(Constants.DriveConstants.mmAccel_ticksPer100msPerSec, to);
+  }
+
   @Override
   public void periodic() {
+
     m_odometry.update(
         Rotation2d.fromDegrees(getHeading()),
         getLeftDistanceMeters(),
@@ -144,6 +171,11 @@ public class DriveSystem extends SubsystemBase {
         Rotation2d.fromDegrees(getHeading()),
         getLeftDistanceMeters(),
         getRightDistanceMeters());
+
+    // Meters travelled 
+    SmartDashboard.putNumber("Drive/LeftMeters", getLeftDistanceMeters());
+    SmartDashboard.putNumber("Drive/RightMeters", getRightDistanceMeters());
+    SmartDashboard.putNumber("Drive/AvgMeters", 0.5 * (getLeftDistanceMeters() + getRightDistanceMeters()));
 
     SmartDashboard.putNumber("Drive/RightEncoderMeters", getRightDistanceMeters());
     SmartDashboard.putNumber("Drive/LeftEncoderMeters", getLeftDistanceMeters());
@@ -157,6 +189,9 @@ public class DriveSystem extends SubsystemBase {
     leaderLeft.set(TalonSRXControlMode.PercentOutput, left);
     leaderRight.set(TalonSRXControlMode.PercentOutput, right);
 
+    if (RobotBase.isSimulation() && simulation != null) {
+      simulation.setOpenLoopPercents(left, right);
+    }
   }
 
   public void StopControllers() {
@@ -184,9 +219,6 @@ public class DriveSystem extends SubsystemBase {
   }
 
   public Pose2d getPose() {
-    if (RobotBase.isSimulation() && simulation != null) {
-      return simulation.getPose();
-    }
     return poseEstimator.getEstimatedPosition();
   }
 
@@ -224,19 +256,22 @@ public class DriveSystem extends SubsystemBase {
     if (RobotBase.isSimulation() && simulation != null) {
       return simulation.getLeftDistanceMeters();
     }
-    return leftEncoder.getPosition().getValueAsDouble() / Constants.DriveConstants.metersPerPulse;
+    double rot = leftEncoder.getPosition().getValueAsDouble(); // rotations
+    return rot * Constants.DriveConstants.metersPerEncoderRotation;
   }
 
   public double getRightDistanceMeters() {
     if (RobotBase.isSimulation() && simulation != null) {
       return simulation.getRightDistanceMeters();
     }
-    return rightEncoder.getPosition().getValueAsDouble() / Constants.DriveConstants.metersPerPulse;
+    double rot = rightEncoder.getPosition().getValueAsDouble(); // rotations
+    return rot * Constants.DriveConstants.metersPerEncoderRotation;
   }
 
   public void resetSimPose() {
     if (RobotBase.isSimulation() && simulation != null) {
       simulation.resetSimPose();
+      resetPose(new Pose2d());
     }
   }
 
@@ -321,26 +356,6 @@ public class DriveSystem extends SubsystemBase {
     return nearestPose;
   }
 
-  public Command updateClosestReefPoses() {
-    return this.runOnce(() -> {
-      nearestPoseToLeftReef = getClosestLeftReefPose();
-      nearestPoseToRightReef = getClosestRightReefPose();
-    });
-  }
-
-  public Command updateClosestAlgaePose() {
-    return this.runOnce(() -> {
-      nearestPoseToAlgaeRemove = getClosestAlgaeRemovePose();
-    });
-  }
-
-  public Command updateClosestStationPose() {
-    return this.runOnce(() -> {
-      nearestPoseToFarCoralStation = getClosestFarCoralStationPose();
-      nearestPoseToNearCoralStation = getClosestNearCoralStationPose();
-    });
-  }
-
   public boolean isTranslationAligned() {
     Translation2d currentTranslation2d = getPose().getTranslation();
     Translation2d targetTranslation2d = targetPose.getTranslation();
@@ -397,6 +412,7 @@ public class DriveSystem extends SubsystemBase {
   public static Simulation getSimulation() {
     return simulation;
   }
+
   public boolean playSong(String chrpFilename) {
     var status = orchestra.loadMusic(chrpFilename);
     if (status.isOK()) {
@@ -421,6 +437,47 @@ public class DriveSystem extends SubsystemBase {
 
   public boolean isSongPlaying() {
     return orchestra != null && orchestra.isPlaying();
+  }
+
+  // Motion Magic with Arcade Drive
+  public void arcadeDriveClosedLoop(double xSpeed, double zRotation, boolean useMM) {
+    double now = Timer.getFPGATimestamp();
+    double dt = Math.max(0.0, now - lastTs);
+    lastTs = now;
+
+    if (RobotBase.isSimulation()) {
+      useMM = false;
+    }
+
+    if (useMM) {
+      double v = xSpeed * Constants.DriveConstants.maxLinearSpeedMps;
+      double omega = zRotation * Constants.DriveConstants.maxAngularSpeedRadPerSec;
+
+      double halfTrack = Constants.DriveConstants.trackWidthMeters / 2.0;
+      double leftDelta = (v - omega * halfTrack) * dt;
+      double rightDelta = (v + omega * halfTrack) * dt;
+
+      leftTargetMeters += leftDelta;
+      rightTargetMeters += rightDelta;
+
+      int leftTicks = (int) Math.round(leftTargetMeters * Constants.DriveConstants.ticksPerMeter);
+      int rightTicks = (int) Math.round(rightTargetMeters * Constants.DriveConstants.ticksPerMeter);
+
+      leaderLeft.set(TalonSRXControlMode.MotionMagic, leftTicks);
+      leaderRight.set(TalonSRXControlMode.MotionMagic, rightTicks);
+    } else {
+      double straighten = 0.0;
+      boolean straightMode = Math.abs(xSpeed) > 0.05 && Math.abs(zRotation) < 0.2;
+      if (straightMode) {
+        double distErr = getLeftDistanceMeters() - getRightDistanceMeters();
+        straighten = Constants.DriveConstants.straightenKp * distErr;
+      }
+
+      double left = xSpeed + zRotation - straighten;
+      double right = xSpeed - zRotation + straighten;
+
+      setPowerPercent(left, right);
+    }
   }
 
 }

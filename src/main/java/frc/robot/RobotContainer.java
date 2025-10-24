@@ -25,6 +25,7 @@ import edu.wpi.first.wpilibj2.command.RunCommand;
 import frc.robot.subsystems.EndEffectorSubsystem;
 import frc.robot.subsystems.Vision.VisionSubsystem;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.RobotBase;
 
 public class RobotContainer {
   // Enums are cool
@@ -74,6 +75,8 @@ public class RobotContainer {
     CommandScheduler.getInstance().registerSubsystem(m_driveSystem);
     CommandScheduler.getInstance().registerSubsystem(m_Vision);
     CommandScheduler.getInstance().registerSubsystem(m_DeepClimbSubsystem);
+    // Disable MotorSafety on the unused DifferentialDrive instance
+    m_robotDrive.setSafetyEnabled(false);
     // Binds
     configureNamedCommands();
     configureBindings();
@@ -90,8 +93,7 @@ public class RobotContainer {
   private void DriverBinds() {
 
 
-    driver.RB.onTrue(new InstantCommand(() -> m_driveSystem.driveToPose(m_driveSystem.nearestPoseToRightReef)));
-    driver.LB.onTrue(new InstantCommand(() -> m_driveSystem.driveToPose(m_driveSystem.nearestPoseToLeftReef)));
+    // Toggle intake / score
     driver.A.onTrue(new InstantCommand(() -> {
       if (currentState == BotState.INTAKING) {
         currentState = BotState.SCORING;
@@ -100,6 +102,7 @@ public class RobotContainer {
       }
     }));
 
+    // Set Ground intake 
     driver.Y.onTrue(new InstantCommand(() -> groundIntake = !groundIntake));
 
 
@@ -108,10 +111,9 @@ public class RobotContainer {
         () -> {
           double xSpeed = -driver.getLeftY();
           double zRotation = driver.getLeftX();
-        
-          m_robotDrive.arcadeDrive(xSpeed, zRotation, true);
-
-
+          // Use MM on real robot, open-loop in sim
+          boolean useMM = !RobotBase.isSimulation();
+          m_driveSystem.arcadeDriveClosedLoop(xSpeed, zRotation, useMM);
         },
         m_driveSystem
       )

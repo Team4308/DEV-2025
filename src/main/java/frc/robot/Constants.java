@@ -1,5 +1,7 @@
 package frc.robot;
 
+import edu.wpi.first.math.util.Units;
+
 public final class Constants {
     public static final class LoggedDashboard {
         public static final boolean TUNING_MODE = false;
@@ -69,11 +71,11 @@ public final class Constants {
 
     public static final class DriveConstants {
         // Drive Constants
-        public static final double trackWidthMeters = 0.6;
-        public static final int leftEncoder = 0;
-        public static final int rightEncoder = 1;
-        public static final double gearRatio = 7 / 125;
-        public static final double wheelDiameter = 0.1524;
+        public static final double trackWidthMeters = 0.635;
+        public static final int leftEncoder = 7;
+        public static final int rightEncoder = 8;
+        public static final double gearRatio = 125 / 7;
+        public static final double wheelDiameter = Units.inchesToMeters(6.0);
         // Output limits
         public static final double nominalOutputForward = 0.0;
         public static final double nominalOutputReverse = 0.0;
@@ -105,12 +107,29 @@ public final class Constants {
         public static int Left_Back = 2;
         public static int Right_Front = 3;
         public static int Right_Back = 4;
-        public static boolean Left_Front_Inverted = false;
+
+        public static boolean Left_Front_Inverted = true;
         public static boolean Right_Front_Inverted = true;
 
-        public static boolean Left_Back_Inverted = true;
+        public static boolean Left_Back_Inverted = false;
         public static boolean Right_Back_Inverted = true;
 
+        // Distance conversions
+        public static final double wheelCircumferenceMeters = Math.PI * wheelDiameter;
+        public static final double encoderRotToWheelRot = 1.0 / Math.max(1e-9, gearRatio);
+        public static final double metersPerEncoderRotation = wheelCircumferenceMeters * encoderRotToWheelRot;
+        public static final double ticksPerMeter = pulsesPerRotation / metersPerEncoderRotation;
+
+        // Motion Magic gains (tune)
+        public static final double mm_kP = 0.2;
+        public static final double mm_kI = 0.0;
+        public static final double mm_kD = 0.0;
+        public static final double mm_kF = 0.0;
+
+        public static final int mmCruiseVel_ticksPer100ms = 12000;
+        public static final int mmAccel_ticksPer100msPerSec = 24000;
+
+        public static final double straightenKp = 0.4;
     }
 
     public static final class Vision {

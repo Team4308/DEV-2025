@@ -15,7 +15,6 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.RobotBase;
-import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.math.kinematics.DifferentialDriveKinematics;
@@ -41,8 +40,6 @@ import org.photonvision.simulation.VisionSystemSim;
 import frc.robot.Constants;
 
 public class Simulation extends SubsystemBase {
-    private final WPI_TalonSRX leftLeader;
-    private final WPI_TalonSRX rightLeader;
     private final Encoder leftEncoder;
     private final Encoder rightEncoder;
     private DifferentialDrivetrainSim drivetrainSimulator;
@@ -76,7 +73,6 @@ public class Simulation extends SubsystemBase {
     private NetworkTableEntry armVoltageEntry;
 
     // PhotonVision sim 
-    // PhotonVision sim 
     private PhotonCamera photonCamera;
     private PhotonPoseEstimator photonEstimator;
     private VisionSystemSim visionSim;
@@ -85,7 +81,10 @@ public class Simulation extends SubsystemBase {
     private AprilTagFieldLayout tagLayout;
     private SimCameraProperties simCamProps;
 
-    //  vision estimate
+    // Open-loop inputs from DriveSystem
+    private volatile double leftOpenLoop = 0.0;
+    private volatile double rightOpenLoop = 0.0;
+
     //  vision estimate
     public static class VisionEstimate {
         public final Pose2d pose;
@@ -137,10 +136,8 @@ public class Simulation extends SubsystemBase {
         if (armVoltageEntry != null) armVoltageEntry.setDouble(armInputVoltage);
     }
 
-    public Simulation(WPI_TalonSRX leftLeader, WPI_TalonSRX rightLeader, Encoder leftEncoder, Encoder rightEncoder) {
+    public Simulation(Encoder leftEncoder, Encoder rightEncoder) {
         
-        this.leftLeader = leftLeader;
-        this.rightLeader = rightLeader;
         this.leftEncoder = leftEncoder;
         this.rightEncoder = rightEncoder;
         mech = new LoggedMechanism2d(10, 10);
@@ -151,12 +148,12 @@ public class Simulation extends SubsystemBase {
         kinematics = new DifferentialDriveKinematics(0.65);
         if (RobotBase.isSimulation()) {
             drivetrainSimulator = new DifferentialDrivetrainSim(
-                DCMotor.getCIM(3),
-                10.71,
+                DCMotor.getCIM(4),
+                125/7,
                 3.0,
                 60.0,
-                0.0762,
-                0.65,
+                Constants.DriveConstants.wheelDiameter / 2.0,
+                Constants.DriveConstants.trackWidthMeters,
                 VecBuilder.fill(0.0001, 0.0001, 0.0001, 0.001, 0.001, 0.0001, 0.0001));
                 
             leftEncoderSim = new EncoderSim(this.leftEncoder);
@@ -233,32 +230,35 @@ public class Simulation extends SubsystemBase {
             );
         }
     }
+
+    // Allow DriveSystem to feed sim with commanded percents
+    public void setOpenLoopPercents(double left, double right) {
+        leftOpenLoop = left;
+        rightOpenLoop = right;
+    }
     
     @Override
     public void simulationPeriodic() {
         if (!RobotBase.isSimulation()) return;
-        // Arm sim tick
         Arm();
 
-        double leftVoltage = leftLeader.get() * RobotController.getBatteryVoltage();
-        double rightVoltage = rightLeader.get() * RobotController.getBatteryVoltage();
-        leftVoltage = Math.abs(leftVoltage) < 0.1 ? 0 : leftVoltage;
-        rightVoltage = Math.abs(rightVoltage) < 0.1 ? 0 : rightVoltage;
-        
+        double battery = RobotController.getBatteryVoltage();
+        double leftVoltage = leftOpenLoop * battery;
+        double rightVoltage = rightOpenLoop * battery;
+
         drivetrainSimulator.setInputs(leftVoltage, rightVoltage);
         drivetrainSimulator.update(0.020);
-        
+
         leftEncoderSim.setDistance(drivetrainSimulator.getLeftPositionMeters());
         leftEncoderSim.setRate(drivetrainSimulator.getLeftVelocityMetersPerSecond());
         rightEncoderSim.setDistance(drivetrainSimulator.getRightPositionMeters());
         rightEncoderSim.setRate(drivetrainSimulator.getRightVelocityMetersPerSecond());
         setSimHeadingDegrees(-drivetrainSimulator.getHeading().getDegrees());
-        
+
         fieldSim.setRobotPose(drivetrainSimulator.getPose());
-        
+
         updateAdvantageScope();
 
-        // Update encoder+gyro odometry and publish
         var odomPose = simOdometry.update(
             Rotation2d.fromDegrees(headingDeg),
             drivetrainSimulator.getLeftPositionMeters(),
@@ -270,77 +270,76 @@ public class Simulation extends SubsystemBase {
             });
         }
 
-            Pose2d poseForVision = drivetrainSimulator.getPose();
-            visionSim.update(poseForVision);
+        Pose2d poseForVision = drivetrainSimulator.getPose();
+        visionSim.update(poseForVision);
 
-            var result = photonCamera.getLatestResult();
-            if (result != null) {
-                int tagCount = result.hasTargets() ? result.getTargets().size() : 0;
+        var result = photonCamera.getLatestResult();
+        if (result != null) {
+            int tagCount = result.hasTargets() ? result.getTargets().size() : 0;
 
-                if (result.hasTargets()) {
-                    var estOpt = photonEstimator.update(result);
-                    if (estOpt.isPresent()) {
-                        var est = estOpt.get();
-                        latestVisionEstimate = new VisionEstimate(est.estimatedPose.toPose2d(), est.timestampSeconds);
+            if (result.hasTargets()) {
+                var estOpt = photonEstimator.update(result);
+                if (estOpt.isPresent()) {
+                    var est = estOpt.get();
+                    latestVisionEstimate = new VisionEstimate(est.estimatedPose.toPose2d(), est.timestampSeconds);
 
-                        tagCount = result.getTargets().size();
-                        
-                        double[] visionPose2d = {
-                            latestVisionEstimate.pose.getX(),
-                            latestVisionEstimate.pose.getY(),
-                            latestVisionEstimate.pose.getRotation().getDegrees()
-                        };
-                        simVisionPoseEntry.setDoubleArray(visionPose2d);
-                        visionPose2dEntry.setDoubleArray(visionPose2d);
+                    tagCount = result.getTargets().size();
+                    
+                    double[] visionPose2d = {
+                        latestVisionEstimate.pose.getX(),
+                        latestVisionEstimate.pose.getY(),
+                        latestVisionEstimate.pose.getRotation().getDegrees()
+                    };
+                    simVisionPoseEntry.setDoubleArray(visionPose2d);
+                    visionPose2dEntry.setDoubleArray(visionPose2d);
 
-                        Pose2d odomPoseForVision = drivetrainSimulator.getPose();
-                        Pose2d interp = new Pose2d(
-                            odomPoseForVision.getTranslation().interpolate(latestVisionEstimate.pose.getTranslation(), 0.5),
-                            odomPoseForVision.getRotation().interpolate(latestVisionEstimate.pose.getRotation(), 0.5)
-                        );
-                        double[] interpPose2d = {
-                            interp.getX(),
-                            interp.getY(),
-                            interp.getRotation().getDegrees()
-                        };
-                        interpPose2dEntry.setDoubleArray(interpPose2d);
+                    Pose2d odomPoseForVision = drivetrainSimulator.getPose();
+                    Pose2d interp = new Pose2d(
+                        odomPoseForVision.getTranslation().interpolate(latestVisionEstimate.pose.getTranslation(), 0.5),
+                        odomPoseForVision.getRotation().interpolate(latestVisionEstimate.pose.getRotation(), 0.5)
+                    );
+                    double[] interpPose2d = {
+                        interp.getX(),
+                        interp.getY(),
+                        interp.getRotation().getDegrees()
+                    };
+                    interpPose2dEntry.setDoubleArray(interpPose2d);
 
-                        double latencyMs = frc.robot.Constants.Vision.simLatencyMs;
-                        double[] botpose = new double[] {
-                            latestVisionEstimate.pose.getX(),
-                            latestVisionEstimate.pose.getY(),
-                            0.0,
-                            0.0,
-                            0.0,
-                            latestVisionEstimate.pose.getRotation().getDegrees(),
-                            latencyMs
-                        };
+                    double latencyMs = frc.robot.Constants.Vision.simLatencyMs;
+                    double[] botpose = new double[] {
+                        latestVisionEstimate.pose.getX(),
+                        latestVisionEstimate.pose.getY(),
+                        0.0,
+                        0.0,
+                        0.0,
+                        latestVisionEstimate.pose.getRotation().getDegrees(),
+                        latencyMs
+                    };
 
-                        NetworkTableInstance.getDefault()
-                            .getTable("/AdvantageScope/Vision")
-                            .getEntry("TagCount")
-                            .setDouble(tagCount);
-                    } else {
-
-                        NetworkTableInstance.getDefault()
-                            .getTable("/AdvantageScope/Vision")
-                            .getEntry("TagCount")
-                            .setDouble(tagCount);
-                    }
+                    NetworkTableInstance.getDefault()
+                        .getTable("/AdvantageScope/Vision")
+                        .getEntry("TagCount")
+                        .setDouble(tagCount);
                 } else {
 
                     NetworkTableInstance.getDefault()
                         .getTable("/AdvantageScope/Vision")
                         .getEntry("TagCount")
-                        .setDouble(0);
+                        .setDouble(tagCount);
                 }
             } else {
+
                 NetworkTableInstance.getDefault()
                     .getTable("/AdvantageScope/Vision")
                     .getEntry("TagCount")
                     .setDouble(0);
             }
-
+        } else {
+            NetworkTableInstance.getDefault()
+                .getTable("/AdvantageScope/Vision")
+                .getEntry("TagCount")
+                .setDouble(0);
+        }
     }
     
     private void updateAdvantageScope() {
