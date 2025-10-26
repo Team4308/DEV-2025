@@ -5,10 +5,8 @@
 package frc.robot;
 
 
-import frc.robot.commands.intake;
 import frc.robot.commands.score;
 import frc.robot.commands.Sequential.CoralIntakeCommand;
-import frc.robot.commands.Sequential.DriveToCoralCommand;
 import frc.robot.subsystems.ArmSubsystem;
 import frc.robot.subsystems.DeepClimbSubsystem;
 import frc.robot.subsystems.DriveSystem;
@@ -26,7 +24,6 @@ import edu.wpi.first.wpilibj2.command.RunCommand;
 import frc.robot.subsystems.EndEffectorSubsystem;
 import frc.robot.subsystems.Vision.VisionSubsystem;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
-import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.XboxController;
 
 public class RobotContainer {

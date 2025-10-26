@@ -4,28 +4,24 @@ import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
-// Removed unused RelativeEncoder import
-// import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkAbsoluteEncoder;
 import com.revrobotics.spark.SparkBase;
-
-import edu.wpi.first.math.controller.ProfiledPIDController;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.ArmFeedforward;
-import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj.Timer;
 import frc.robot.Constants.ArmConstants;
 
 public class ArmSubsystem extends SubsystemBase {
     private final SparkMax armMotor;
     private final SparkAbsoluteEncoder encoder;
-    private final ProfiledPIDController controller = new ProfiledPIDController(
-        ArmConstants.kP, ArmConstants.kI, ArmConstants.kD,
-        new TrapezoidProfile.Constraints(ArmConstants.MAX_VEL_DEG_PER_S, ArmConstants.MAX_ACC_DEG_PER_S2)
-    );
+    private final PIDController controller = new PIDController(ArmConstants.kP, ArmConstants.kI, ArmConstants.kD);
     private final ArmFeedforward ff = new ArmFeedforward(ArmConstants.kS, ArmConstants.kG, ArmConstants.kV);
     private double targetAngle = ArmConstants.RESTING_ANGLE;
+    private double setpointAngleDeg = targetAngle;
+    private double lastTimestampSec = 0.0;
 
     private final boolean simActive = RobotBase.isSimulation();
     private Simulation sim = null;
@@ -45,9 +41,10 @@ public class ArmSubsystem extends SubsystemBase {
 
         double initAngleDeg = encoder.getPosition();
         targetAngle = initAngleDeg;
-        controller.reset(initAngleDeg);
-        controller.setGoal(targetAngle);
+        setpointAngleDeg = initAngleDeg;
+        controller.reset();
         controller.setTolerance(1.0);
+        lastTimestampSec = Timer.getFPGATimestamp();
 
         if (simActive) {
             sim = DriveSystem.getSimulation();
@@ -78,7 +75,6 @@ public class ArmSubsystem extends SubsystemBase {
 
     private void updateTargetAngleDeg(double targetDeg) {
         targetAngle = targetDeg;
-        controller.setGoal(targetAngle);
         if (simActive && sim != null) {
             sim.setArmTargetAngleDeg(targetAngle);
         }
@@ -96,9 +92,12 @@ public class ArmSubsystem extends SubsystemBase {
                 sim.setArmTargetAngleDeg(targetAngle);
                 sim.setArmVoltage(lastVolts);
             }
-
         }
         
+        double now = Timer.getFPGATimestamp();
+        double dt = Math.max(0.0, now - lastTimestampSec);
+        lastTimestampSec = now;
+
         double rawAngleDeg = simActive && sim != null ? sim.getArmAngleDeg() : encoder.getPosition();
         SmartDashboard.putNumber("Angle Arm", encoder.getPosition());
         double currentAngleDeg = rawAngleDeg;
@@ -106,21 +105,30 @@ public class ArmSubsystem extends SubsystemBase {
         double pct = manualPercent;
         if (Math.abs(pct) > 0.05) { 
             applyMotorOutput(pct * 12.0);
-            controller.reset(currentAngleDeg);
-            controller.setGoal(currentAngleDeg);
+            setpointAngleDeg = currentAngleDeg;
+            controller.reset();
             if (simActive && sim != null) {
                 sim.setArmTargetAngleDeg(currentAngleDeg);
             }
             return;
         }
 
-        double pidEffort = controller.calculate(currentAngleDeg);
-        TrapezoidProfile.State sp = controller.getSetpoint();
-        double ffVolts = ff.calculate(Math.toRadians(sp.position), Math.toRadians(sp.velocity));
+        double maxStepDeg = ArmConstants.MAX_VEL_DEG_PER_S * dt;
+        double errorToTarget = targetAngle - setpointAngleDeg;
+        double dir = Math.signum(errorToTarget);
+        if (Math.abs(errorToTarget) <= maxStepDeg || maxStepDeg <= 1e-6) {
+            setpointAngleDeg = targetAngle;
+        } else {
+            setpointAngleDeg += dir * maxStepDeg;
+        }
+        double desiredVelDegPerS = (setpointAngleDeg == targetAngle) ? 0.0 : dir * ArmConstants.MAX_VEL_DEG_PER_S;
+
+        double pidEffort = controller.calculate(currentAngleDeg, setpointAngleDeg);
+        double ffVolts = ff.calculate(Math.toRadians(setpointAngleDeg), Math.toRadians(desiredVelDegPerS));
         applyMotorOutput(pidEffort + ffVolts);
 
         if (simActive && sim != null) {
-            sim.setArmTargetAngleDeg(controller.getGoal().position);
+            sim.setArmTargetAngleDeg(setpointAngleDeg);
         }
     }
 }
