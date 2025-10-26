@@ -1,14 +1,10 @@
 package frc.robot.subsystems;
 
 
-import javax.swing.table.TableColumn;
 
 import com.ctre.phoenix.motorcontrol.TalonSRXControlMode;
 import com.ctre.phoenix.motorcontrol.can.TalonSRX;
 import com.ctre.phoenix.motorcontrol.can.TalonSRXConfiguration;
-import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.hardware.TalonFX;
-import com.ctre.phoenix6.signals.NeutralModeValue;
 
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -54,17 +50,21 @@ public class EndEffectorSubsystem extends SubsystemBase  {
         setMotorSpeed(-0.25);
     }
 
+    private BotState previousState = null;
+
     @Override
     public void periodic() {
+
         SmartDashboard.putBoolean("Coral Intook", intakeSensor.get());
         SmartDashboard.putNumber("Intake Motor Speed", intakeMotor.getMotorOutputPercent());
-    
 
-        if (RobotContainer.currentState == BotState.INTAKING) {
-          CommandScheduler.getInstance().schedule(new CoralIntakeCommand(this, RobotContainer.m_armSubsystem, RobotContainer.groundIntake()));
-        } else if (RobotContainer.currentState == BotState.SCORING) {
-            CommandScheduler.getInstance().schedule(new score(this, RobotContainer.m_armSubsystem));
+        if (RobotContainer.currentState != previousState) {
+            if (RobotContainer.currentState == BotState.INTAKING) {
+                CommandScheduler.getInstance().schedule(new CoralIntakeCommand(this, RobotContainer.m_armSubsystem, RobotContainer.groundIntake()));
+            } else if (RobotContainer.currentState == BotState.SCORING) {
+                CommandScheduler.getInstance().schedule(new score(this, RobotContainer.m_armSubsystem));
+            }
+            previousState = RobotContainer.currentState;
         }
-
     }
 }

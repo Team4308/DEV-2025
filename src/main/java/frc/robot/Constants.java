@@ -53,7 +53,7 @@ public final class Constants {
         public static final double RESTING_ANGLE = 15.0;
         public static final double FEEDER_ANGLE = 90.0;
         public static final double GROUND_ANGLE = 0.0;
-        public static final double kP = 1;
+        public static final double kP = 0.001;
         public static final double kI = 0.0;
         public static final double kD = 0.0;
 
@@ -64,7 +64,7 @@ public final class Constants {
         // Offset
         public static final double ZERO_OFFSET_DEG = 0.0;
         public static final double GEAR_RATIO = 500.0;
-        public static final double DEG_PER_ENCODER_UNIT = 360.0 / GEAR_RATIO;
+        public static final double DEG_PER_ENCODER_UNIT = 360.0;
 
         // Profiling
         public static final double MAX_VEL_DEG_PER_S = 120.0;

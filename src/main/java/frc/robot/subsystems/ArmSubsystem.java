@@ -4,7 +4,9 @@ import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
-import com.revrobotics.RelativeEncoder;
+// Removed unused RelativeEncoder import
+// import com.revrobotics.RelativeEncoder;
+import com.revrobotics.spark.SparkAbsoluteEncoder;
 import com.revrobotics.spark.SparkBase;
 
 import edu.wpi.first.math.controller.ProfiledPIDController;
@@ -12,12 +14,12 @@ import edu.wpi.first.math.controller.ArmFeedforward;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj.RobotBase;
-
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.ArmConstants;
 
 public class ArmSubsystem extends SubsystemBase {
     private final SparkMax armMotor;
-    private final RelativeEncoder encoder;
+    private final SparkAbsoluteEncoder encoder;
     private final ProfiledPIDController controller = new ProfiledPIDController(
         ArmConstants.kP, ArmConstants.kI, ArmConstants.kD,
         new TrapezoidProfile.Constraints(ArmConstants.MAX_VEL_DEG_PER_S, ArmConstants.MAX_ACC_DEG_PER_S2)
@@ -28,18 +30,20 @@ public class ArmSubsystem extends SubsystemBase {
     private final boolean simActive = RobotBase.isSimulation();
     private Simulation sim = null;
     private double lastVolts = 0.0;
+    private double manualPercent = 0.0;
 
     public ArmSubsystem() {
         armMotor = new SparkMax(ArmConstants.ARM_MOTOR_ID, MotorType.kBrushless);
         SparkMaxConfig config = new SparkMaxConfig();
-        config.idleMode(SparkBaseConfig.IdleMode.kBrake);
-        config.encoder.positionConversionFactor(ArmConstants.DEG_PER_ENCODER_UNIT);
-        config.encoder.velocityConversionFactor(ArmConstants.DEG_PER_ENCODER_UNIT / 60.0);
+        config.inverted(true);
+
+        config.idleMode(SparkBaseConfig.IdleMode.kCoast);
+        config.absoluteEncoder.zeroOffset(ArmConstants.ZERO_OFFSET_DEG);
         armMotor.configure(config, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
 
-        encoder = armMotor.getEncoder();
+        encoder = armMotor.getAbsoluteEncoder();
 
-        double initAngleDeg = encoder.getPosition() - ArmConstants.ZERO_OFFSET_DEG;
+        double initAngleDeg = encoder.getPosition();
         targetAngle = initAngleDeg;
         controller.reset(initAngleDeg);
         controller.setGoal(targetAngle);
@@ -80,6 +84,10 @@ public class ArmSubsystem extends SubsystemBase {
         }
     }
 
+    public void setManualPercent(double percent) {
+        manualPercent = Math.max(-1.0, Math.min(1.0, percent));
+    }
+
     @Override
     public void periodic() {
         if (simActive && sim == null) {
@@ -88,10 +96,24 @@ public class ArmSubsystem extends SubsystemBase {
                 sim.setArmTargetAngleDeg(targetAngle);
                 sim.setArmVoltage(lastVolts);
             }
+
+        }
+        
+        double rawAngleDeg = simActive && sim != null ? sim.getArmAngleDeg() : encoder.getPosition();
+        SmartDashboard.putNumber("Angle Arm", encoder.getPosition());
+        double currentAngleDeg = rawAngleDeg;
+
+        double pct = manualPercent;
+        if (Math.abs(pct) > 0.05) { 
+            applyMotorOutput(pct * 12.0);
+            controller.reset(currentAngleDeg);
+            controller.setGoal(currentAngleDeg);
+            if (simActive && sim != null) {
+                sim.setArmTargetAngleDeg(currentAngleDeg);
+            }
+            return;
         }
 
-        double rawAngleDeg = simActive && sim != null ? sim.getArmAngleDeg() : encoder.getPosition();
-        double currentAngleDeg = rawAngleDeg - ArmConstants.ZERO_OFFSET_DEG;
         double pidEffort = controller.calculate(currentAngleDeg);
         TrapezoidProfile.State sp = controller.getSetpoint();
         double ffVolts = ff.calculate(Math.toRadians(sp.position), Math.toRadians(sp.velocity));

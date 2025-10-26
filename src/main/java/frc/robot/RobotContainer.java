@@ -5,6 +5,7 @@
 package frc.robot;
 
 
+import frc.robot.commands.intake;
 import frc.robot.commands.score;
 import frc.robot.commands.Sequential.CoralIntakeCommand;
 import frc.robot.commands.Sequential.DriveToCoralCommand;
@@ -26,6 +27,7 @@ import frc.robot.subsystems.EndEffectorSubsystem;
 import frc.robot.subsystems.Vision.VisionSubsystem;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.XboxController;
 
 public class RobotContainer {
   // Enums are cool
@@ -65,6 +67,7 @@ public class RobotContainer {
 // Controllers 
   private final XBoxWrapper driver = new XBoxWrapper(Ports.Joysticks.DRIVER);
   private final XBoxWrapper operator = new XBoxWrapper(Ports.Joysticks.OPERATOR);
+  private final XboxController driverController = new XboxController(0);
   // Auto 
   private final SendableChooser<Command> autoChooser;
 
@@ -81,6 +84,16 @@ public class RobotContainer {
     // Auto 
     autoChooser = AutoBuilder.buildAutoChooser();
     SmartDashboard.putData("Auto Chooser", autoChooser);
+
+
+    // Manuel controlle for arm
+    m_armSubsystem.setDefaultCommand(
+      new RunCommand(() -> {
+        double y = -driverController.getRightY(); // up = +1
+        if (Math.abs(y) < 0.05) y = 0.0; // deadband
+        m_armSubsystem.setManualPercent(y); 
+      }, m_armSubsystem)
+    );
   }
 
   private void configureBindings() {
@@ -92,26 +105,24 @@ public class RobotContainer {
 
 
     // Toggle intake / score
-    driver.A.onTrue(new InstantCommand(() -> {
-      if (currentState == BotState.INTAKING) {
-        currentState = BotState.SCORING;
-      } else {
-        currentState = BotState.INTAKING;
-      }
-    }));
+    // driver.A.onTrue(new InstantCommand(() -> {
+    //   if (currentState == BotState.INTAKING) {
+    //     currentState = BotState.SCORING;
+    //   } else {
+    //     currentState = BotState.INTAKING;
+    //   }
+    // }));
 
     // Set Ground intake 
     driver.Y.onTrue(new InstantCommand(() -> groundIntake = !groundIntake));
-
-
+    
+    
     m_driveSystem.setDefaultCommand(
       new RunCommand(
         () -> {
           double xSpeed = -driver.getLeftY();
           double zRotation = driver.getLeftX();
-
-          // Enable / Disable motion magic for drive system 
-          boolean useMM = !RobotBase.isSimulation();
+          boolean useMM = false;
 
           m_driveSystem.arcadeDriveClosedLoop(xSpeed, zRotation, useMM);
         },
@@ -136,8 +147,21 @@ public class RobotContainer {
   //   operator.A.onTrue(new score(m_intakeSubsystem, m_armSubsystem));
   //  }
   
-  
-    
+
+    operator.B.onTrue(new InstantCommand(() -> {
+      m_intakeSubsystem.intake();
+    }));
+
+    operator.B.onFalse(new InstantCommand(() -> {
+      m_intakeSubsystem.stop();
+    }));
+
+    operator.A.onTrue(new InstantCommand(() -> {
+      m_intakeSubsystem.outtake();
+    }));
+    operator.A.onFalse(new InstantCommand(() -> {
+      m_intakeSubsystem.stop();
+    }));
 
 
   }
